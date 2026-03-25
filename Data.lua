@@ -80,7 +80,7 @@ Spoilscribe.Data.Dungeons = {
     },
     {
         name = "Maisara Caverns",
-        ejInstanceID = 1305,
+        ejInstanceID = 1315,
         encounters = { 2810, 2811, 2812 },
     },
     {
