@@ -126,6 +126,55 @@ local function GetQualityColoredItemText(loot)
     return name
 end
 
+local function NormalizeSlotText(value)
+    if not value then
+        return ""
+    end
+
+    local normalized = string.lower(tostring(value))
+    normalized = normalized:gsub("[^%a%d]", "")
+    return normalized
+end
+
+local function LootMatchesSlotFilter(loot, selectedSlotLabel)
+    if not selectedSlotLabel or selectedSlotLabel == "Any Slot" then
+        return true
+    end
+
+    local normalizedSlot = NormalizeSlotText(loot and loot.slot)
+    if normalizedSlot == "" then
+        return false
+    end
+
+    local normalizedFilter = NormalizeSlotText(selectedSlotLabel)
+    local aliasesByFilter = {
+        head = { "head" },
+        neck = { "neck" },
+        shoulder = { "shoulder" },
+        back = { "back", "cloak" },
+        chest = { "chest", "robe", "tunic", "vest" },
+        wrist = { "wrist", "bracer" },
+        hands = { "hands", "hand", "glove", "gauntlet" },
+        waist = { "waist", "belt" },
+        legs = { "legs", "leg", "leggings", "pants", "greaves" },
+        feet = { "feet", "foot", "boot" },
+        ring = { "ring", "finger" },
+        trinket = { "trinket" },
+        onehand = { "onehand", "mainhand", "onehanded" },
+        twohand = { "twohand", "twohanded" },
+        offhand = { "offhand", "heldinoffhand", "shield" },
+    }
+
+    local aliases = aliasesByFilter[normalizedFilter] or { normalizedFilter }
+    for _, alias in ipairs(aliases) do
+        if string.find(normalizedSlot, alias, 1, true) then
+            return true
+        end
+    end
+
+    return false
+end
+
 function Spoilscribe:BuildLootLines()
     local frame = self.UI and self.UI.frame
     if not frame then
@@ -133,6 +182,10 @@ function Spoilscribe:BuildLootLines()
     end
 
     local difficulty = self.Data.Difficulties[frame.selectedDifficultyIndex or 1]
+    local selectedSlotLabel = "Any Slot"
+    if self.Data and self.Data.Filters and self.Data.Filters.slots then
+        selectedSlotLabel = self.Data.Filters.slots[frame.selectedSlotIndex or 1] or "Any Slot"
+    end
 
     EnsureEncounterJournalLoaded()
 
@@ -146,6 +199,7 @@ function Spoilscribe:BuildLootLines()
 
     local lines = {}
     lines[#lines + 1] = string.format("Difficulty: %s", difficulty and difficulty.label or "Unknown")
+    lines[#lines + 1] = string.format("Slot Filter: %s", selectedSlotLabel)
     lines[#lines + 1] = "---------------------------------------------"
 
     local validDungeonCount = 0
@@ -191,23 +245,25 @@ function Spoilscribe:BuildLootLines()
                             break
                         end
 
-                        dungeonHasLoot = true
-                        local itemText = GetQualityColoredItemText(loot)
-                        local slotText = loot.slot or "Unknown slot"
-                        local armorTypeText = loot.armorType or ""
-                        local itemLineText = nil
+                        if LootMatchesSlotFilter(loot, selectedSlotLabel) then
+                            dungeonHasLoot = true
+                            local itemText = GetQualityColoredItemText(loot)
+                            local slotText = loot.slot or "Unknown slot"
+                            local armorTypeText = loot.armorType or ""
+                            local itemLineText = nil
 
-                        if armorTypeText ~= "" then
-                            itemLineText = string.format("  - %s (%s, %s)", itemText, slotText, armorTypeText)
-                        else
-                            itemLineText = string.format("  - %s (%s)", itemText, slotText)
+                            if armorTypeText ~= "" then
+                                itemLineText = string.format("  - %s (%s, %s)", itemText, slotText, armorTypeText)
+                            else
+                                itemLineText = string.format("  - %s (%s)", itemText, slotText)
+                            end
+
+                            lines[#lines + 1] = {
+                                text = itemLineText,
+                                itemID = loot.itemID,
+                                itemLink = loot.link,
+                            }
                         end
-
-                        lines[#lines + 1] = {
-                            text = itemLineText,
-                            itemID = loot.itemID,
-                            itemLink = loot.link,
-                        }
 
                         lootIndex = lootIndex + 1
                     end
