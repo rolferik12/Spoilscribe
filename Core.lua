@@ -99,6 +99,33 @@ local function GetLootInfoByIndex(index, encounterID)
     return nil
 end
 
+local function GetQualityColoredItemText(loot)
+    if loot.link and loot.link ~= "" then
+        return loot.link
+    end
+
+    local name = loot.name or ("Item " .. tostring(loot.itemID))
+    if not loot.itemID then
+        return name
+    end
+
+    local quality = nil
+    if C_Item and C_Item.GetItemQualityByID then
+        quality = C_Item.GetItemQualityByID(loot.itemID)
+    end
+
+    if not quality and GetItemInfo then
+        local _, _, infoQuality = GetItemInfo(loot.itemID)
+        quality = infoQuality
+    end
+
+    if quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality] and ITEM_QUALITY_COLORS[quality].hex then
+        return ITEM_QUALITY_COLORS[quality].hex .. name .. "|r"
+    end
+
+    return name
+end
+
 function Spoilscribe:BuildLootLines()
     local frame = self.UI and self.UI.frame
     if not frame then
@@ -136,20 +163,14 @@ function Spoilscribe:BuildLootLines()
                 EJ_SetDifficulty(difficulty.id)
             end
 
-            lines[#lines + 1] = string.format("== %s ==", dungeon.name)
+            lines[#lines + 1] = ""
+            lines[#lines + 1] = string.format("|cffffd200Dungeon: %s|r", dungeon.name)
+            lines[#lines + 1] = "|cff808080---------------------------------------------|r"
+
+            local dungeonHasLoot = false
 
             for _, encounterID in ipairs(dungeon.encounters) do
                 local encounterSelected, encounterSelectError = TrySelectEncounter(encounterID)
-
-                local encounterName = "Encounter " .. tostring(encounterID)
-                if EJ_GetEncounterInfo then
-                    local possibleName = EJ_GetEncounterInfo(encounterID)
-                    if possibleName and possibleName ~= "" then
-                        encounterName = possibleName
-                    end
-                end
-
-                lines[#lines + 1] = string.format("[%s]", encounterName)
 
                 if not encounterSelected then
                     LogToConsole(string.format(
@@ -162,9 +183,7 @@ function Spoilscribe:BuildLootLines()
                     if encounterSelectError and encounterSelectError ~= "" then
                         lines[#lines + 1] = "  - Reason: " .. encounterSelectError
                     end
-                    lines[#lines + 1] = ""
                 else
-                    local hasLoot = false
                     local lootIndex = 1
                     while true do
                         local loot = GetLootInfoByIndex(lootIndex, encounterID)
@@ -172,27 +191,34 @@ function Spoilscribe:BuildLootLines()
                             break
                         end
 
-                        hasLoot = true
-                        local itemText = loot.link or loot.name or ("Item " .. tostring(loot.itemID))
+                        dungeonHasLoot = true
+                        local itemText = GetQualityColoredItemText(loot)
                         local slotText = loot.slot or "Unknown slot"
                         local armorTypeText = loot.armorType or ""
+                        local itemLineText = nil
 
                         if armorTypeText ~= "" then
-                            lines[#lines + 1] = string.format("  - %s (%s, %s)", itemText, slotText, armorTypeText)
+                            itemLineText = string.format("  - %s (%s, %s)", itemText, slotText, armorTypeText)
                         else
-                            lines[#lines + 1] = string.format("  - %s (%s)", itemText, slotText)
+                            itemLineText = string.format("  - %s (%s)", itemText, slotText)
                         end
+
+                        lines[#lines + 1] = {
+                            text = itemLineText,
+                            itemID = loot.itemID,
+                            itemLink = loot.link,
+                        }
 
                         lootIndex = lootIndex + 1
                     end
-
-                    if not hasLoot then
-                        lines[#lines + 1] = "  - No loot entries found for this encounter/difficulty."
-                    end
-
-                    lines[#lines + 1] = ""
                 end
             end
+
+            if not dungeonHasLoot then
+                lines[#lines + 1] = "  - No loot entries found for this dungeon/difficulty."
+            end
+
+            lines[#lines + 1] = ""
         else
             LogToConsole(string.format(
                 "Instance select failed for %s (EJInstanceID: %d). %s",
@@ -201,7 +227,9 @@ function Spoilscribe:BuildLootLines()
                 tostring(selectError or "No reason provided.")
             ))
 
-            lines[#lines + 1] = string.format("== %s ==", dungeon.name)
+            lines[#lines + 1] = ""
+            lines[#lines + 1] = string.format("|cffffd200Dungeon: %s|r", dungeon.name)
+            lines[#lines + 1] = "|cff808080---------------------------------------------|r"
             lines[#lines + 1] = "  - Skipped: Encounter Journal could not select this instance ID."
             lines[#lines + 1] = string.format("  - EJInstanceID: %d", dungeon.ejInstanceID)
             if selectError and selectError ~= "" then

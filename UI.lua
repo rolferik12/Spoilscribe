@@ -206,22 +206,54 @@ function UI:RenderLoot(lines)
 
     for _, row in ipairs(frame.rows) do
         row:Hide()
-        row:SetText("")
+        row.text:SetText("")
+        row.itemID = nil
+        row.itemLink = nil
     end
 
     local y = -4
     for i, line in ipairs(lines) do
         local row = frame.rows[i]
         if not row then
-            row = frame.content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-            row:SetJustifyH("LEFT")
-            row:SetWidth(830)
+            row = CreateFrame("Button", nil, frame.content)
+            row:SetSize(830, 20)
+            row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            row.text:SetAllPoints(row)
+            row.text:SetJustifyH("LEFT")
+            row:SetScript("OnEnter", function(self)
+                if not (self.itemLink or self.itemID) then
+                    return
+                end
+
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                if self.itemLink and self.itemLink ~= "" then
+                    GameTooltip:SetHyperlink(self.itemLink)
+                elseif self.itemID then
+                    GameTooltip:SetItemByID(self.itemID)
+                end
+                GameTooltip:Show()
+            end)
+            row:SetScript("OnLeave", function()
+                GameTooltip:Hide()
+            end)
             frame.rows[i] = row
         end
+
+        local text = line
+        if type(line) == "table" then
+            text = line.text or ""
+            row.itemID = line.itemID
+            row.itemLink = line.itemLink
+        else
+            row.itemID = nil
+            row.itemLink = nil
+        end
+
+        row:EnableMouse(row.itemID ~= nil or (row.itemLink ~= nil and row.itemLink ~= ""))
         row:SetPoint("TOPLEFT", frame.content, "TOPLEFT", 4, y)
-        row:SetText(line)
+        row.text:SetText(text)
         row:Show()
-        y = y - 18
+        y = y - 20
     end
 
     frame.content:SetHeight(math.max(20, -y + 8))
