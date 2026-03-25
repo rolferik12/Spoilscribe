@@ -287,11 +287,7 @@ function Spoilscribe:BuildLootLines()
                 EJ_SetDifficulty(difficulty.id)
             end
 
-            lines[#lines + 1] = ""
-            lines[#lines + 1] = string.format("|cffffd200Dungeon: %s|r", dungeon.name)
-            lines[#lines + 1] = "|cff808080---------------------------------------------|r"
-
-            local dungeonHasLoot = false
+            local dungeonItems = {}
 
             for _, encounterID in ipairs(dungeon.encounters) do
                 local encounterSelected, encounterSelectError = TrySelectEncounter(encounterID)
@@ -303,10 +299,6 @@ function Spoilscribe:BuildLootLines()
                         tonumber(encounterID) or 0,
                         tostring(encounterSelectError or "No reason provided.")
                     ))
-                    lines[#lines + 1] = string.format("  - Encounter select failed for ID %d", encounterID)
-                    if encounterSelectError and encounterSelectError ~= "" then
-                        lines[#lines + 1] = "  - Reason: " .. encounterSelectError
-                    end
                 else
                     local lootIndex = 1
                     while true do
@@ -317,11 +309,10 @@ function Spoilscribe:BuildLootLines()
 
                         if LootMatchesSlotFilter(loot, selectedSlotLabel)
                             and LootMatchesSecondaryFilter(loot, selectedSecondaryLabel) then
-                            dungeonHasLoot = true
                             local itemText = GetQualityColoredItemText(loot)
                             local slotText = loot.slot or "Unknown slot"
                             local armorTypeText = loot.armorType or ""
-                            local itemLineText = nil
+                            local itemLineText
 
                             if armorTypeText ~= "" then
                                 itemLineText = string.format("  - %s (%s, %s)", itemText, slotText, armorTypeText)
@@ -329,7 +320,7 @@ function Spoilscribe:BuildLootLines()
                                 itemLineText = string.format("  - %s (%s)", itemText, slotText)
                             end
 
-                            lines[#lines + 1] = {
+                            dungeonItems[#dungeonItems + 1] = {
                                 text = itemLineText,
                                 itemID = loot.itemID,
                                 itemLink = loot.link,
@@ -341,11 +332,15 @@ function Spoilscribe:BuildLootLines()
                 end
             end
 
-            if not dungeonHasLoot then
-                lines[#lines + 1] = "  - No loot entries found for this dungeon/difficulty."
+            if #dungeonItems > 0 then
+                lines[#lines + 1] = ""
+                lines[#lines + 1] = string.format("|cffffd200Dungeon: %s|r", dungeon.name)
+                lines[#lines + 1] = "|cff808080---------------------------------------------|r"
+                for _, item in ipairs(dungeonItems) do
+                    lines[#lines + 1] = item
+                end
+                lines[#lines + 1] = ""
             end
-
-            lines[#lines + 1] = ""
         else
             LogToConsole(string.format(
                 "Instance select failed for %s (EJInstanceID: %d). %s",
