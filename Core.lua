@@ -175,6 +175,71 @@ local function LootMatchesSlotFilter(loot, selectedSlotLabel)
     return false
 end
 
+local function LootMatchesSecondaryFilter(loot, selectedSecondaryLabel)
+    if not selectedSecondaryLabel or selectedSecondaryLabel == "Any Stats" then
+        return true
+    end
+
+    local function GetItemStatTable(itemRef)
+        if not itemRef then
+            return nil
+        end
+
+        if C_Item and C_Item.GetItemStats then
+            local cStats = C_Item.GetItemStats(itemRef)
+            if cStats then
+                return cStats
+            end
+        end
+
+        if GetItemStats then
+            local stats = GetItemStats(itemRef)
+            if stats then
+                return stats
+            end
+        end
+
+        return nil
+    end
+
+    local stats = nil
+    if loot then
+        stats = GetItemStatTable(loot.link)
+        if not stats and loot.itemID then
+            stats = GetItemStatTable("item:" .. tostring(loot.itemID))
+        end
+    end
+
+    if not stats then
+        return false
+    end
+
+    local requiredTokensByLabel = {
+        ["Critical Strike"] = { "CRIT", "CRITICAL" },
+        ["Haste"] = { "HASTE" },
+        ["Mastery"] = { "MASTERY" },
+        ["Versatility"] = { "VERSATILITY" },
+    }
+
+    local requiredTokens = requiredTokensByLabel[selectedSecondaryLabel]
+    if not requiredTokens then
+        return true
+    end
+
+    for statKey, statValue in pairs(stats) do
+        if statValue and statValue ~= 0 then
+            local upperKey = string.upper(tostring(statKey))
+            for _, token in ipairs(requiredTokens) do
+                if string.find(upperKey, token, 1, true) then
+                    return true
+                end
+            end
+        end
+    end
+
+    return false
+end
+
 function Spoilscribe:BuildLootLines()
     local frame = self.UI and self.UI.frame
     if not frame then
@@ -185,6 +250,10 @@ function Spoilscribe:BuildLootLines()
     local selectedSlotLabel = "Any Slot"
     if self.Data and self.Data.Filters and self.Data.Filters.slots then
         selectedSlotLabel = self.Data.Filters.slots[frame.selectedSlotIndex or 1] or "Any Slot"
+    end
+    local selectedSecondaryLabel = "Any Stats"
+    if self.Data and self.Data.Filters and self.Data.Filters.secondaryStats then
+        selectedSecondaryLabel = self.Data.Filters.secondaryStats[frame.selectedSecondaryIndex or 1] or "Any Stats"
     end
 
     EnsureEncounterJournalLoaded()
@@ -200,6 +269,7 @@ function Spoilscribe:BuildLootLines()
     local lines = {}
     lines[#lines + 1] = string.format("Difficulty: %s", difficulty and difficulty.label or "Unknown")
     lines[#lines + 1] = string.format("Slot Filter: %s", selectedSlotLabel)
+    lines[#lines + 1] = string.format("Secondary Filter: %s", selectedSecondaryLabel)
     lines[#lines + 1] = "---------------------------------------------"
 
     local validDungeonCount = 0
@@ -245,7 +315,8 @@ function Spoilscribe:BuildLootLines()
                             break
                         end
 
-                        if LootMatchesSlotFilter(loot, selectedSlotLabel) then
+                        if LootMatchesSlotFilter(loot, selectedSlotLabel)
+                            and LootMatchesSecondaryFilter(loot, selectedSecondaryLabel) then
                             dungeonHasLoot = true
                             local itemText = GetQualityColoredItemText(loot)
                             local slotText = loot.slot or "Unknown slot"
