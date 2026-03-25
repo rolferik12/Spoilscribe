@@ -1,0 +1,11 @@
+## Interface: 120001
+## Title: Spoilscribe
+## Notes: Dungeon loot browser using static encounter IDs.
+## Author: You
+## Version: 0.1.0
+## SavedVariables: SpoilscribeDB
+
+Bootstrap.lua
+Data.lua
+UI.lua
+Core.lua
