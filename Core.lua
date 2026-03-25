@@ -3,6 +3,8 @@ local addonName, Spoilscribe = ...
 Spoilscribe = Spoilscribe or {}
 _G[addonName] = Spoilscribe
 
+-- Tracks whether any EJ item links were missing during the last scan.
+local _hadMissingLinks = false
 SpoilscribeDB = SpoilscribeDB or {}
 
 local function EnsureEncounterJournalLoaded()
@@ -46,57 +48,66 @@ local function LogToConsole(message)
 end
 
 local function GetLootInfoByIndex(index, encounterID)
+    local itemID, link, name, slot, armorType
+
     if C_EncounterJournal and C_EncounterJournal.GetLootInfoByIndex then
         local info = C_EncounterJournal.GetLootInfoByIndex(index, encounterID)
         if info then
-            return {
-                itemID = info.itemID,
-                link = info.itemLink,
-                name = info.name,
-                slot = info.slot,
-                armorType = info.armorType,
-            }
+            itemID    = info.itemID
+            link      = info.link
+            name      = info.name
+            slot      = info.slot
+            armorType = info.armorType
         end
 
-        -- Some client builds expect only index after EJ_SelectEncounter.
-        local fallbackInfo = C_EncounterJournal.GetLootInfoByIndex(index)
-        if fallbackInfo then
-            return {
-                itemID = fallbackInfo.itemID,
-                link = fallbackInfo.itemLink,
-                name = fallbackInfo.name,
-                slot = fallbackInfo.slot,
-                armorType = fallbackInfo.armorType,
-            }
+        if not itemID then
+            -- Some client builds expect only index after EJ_SelectEncounter.
+            local fallbackInfo = C_EncounterJournal.GetLootInfoByIndex(index)
+            if fallbackInfo then
+                itemID    = fallbackInfo.itemID
+                link      = fallbackInfo.link
+                name      = fallbackInfo.name
+                slot      = fallbackInfo.slot
+                armorType = fallbackInfo.armorType
+            end
         end
     end
 
-    if EJ_GetLootInfoByIndex then
-        local itemID, _, _, name, _, slot, armorType, itemLink = EJ_GetLootInfoByIndex(index, encounterID)
-        if itemID then
-            return {
-                itemID = itemID,
-                link = itemLink,
-                name = name,
-                slot = slot,
-                armorType = armorType,
-            }
-        end
-
-        -- Some builds require encounter to be selected first, then queried by index only.
-        local fallbackItemID, _, _, fallbackName, _, fallbackSlot, fallbackArmorType, fallbackLink = EJ_GetLootInfoByIndex(index)
-        if fallbackItemID then
-            return {
-                itemID = fallbackItemID,
-                link = fallbackLink,
-                name = fallbackName,
-                slot = fallbackSlot,
-                armorType = fallbackArmorType,
-            }
+    if not itemID and EJ_GetLootInfoByIndex then
+        local id, _, _, n, _, s, a, l = EJ_GetLootInfoByIndex(index, encounterID)
+        if id then
+            itemID = id ; link = l ; name = n ; slot = s ; armorType = a
+        else
+            local id2, _, _, n2, _, s2, a2, l2 = EJ_GetLootInfoByIndex(index)
+            if id2 then
+                itemID = id2 ; link = l2 ; name = n2 ; slot = s2 ; armorType = a2
+            end
         end
     end
 
-    return nil
+    if not itemID then return nil end
+
+    -- If the EJ didn't give us a link (item data not yet cached), ask GetItemInfo.
+    -- This also primes the client cache so a retry will get the proper link.
+    if not link or link == "" then
+        if GetItemInfo then
+            local _, cachedLink = GetItemInfo(itemID)
+            if cachedLink and cachedLink ~= "" then
+                link = cachedLink
+            else
+                -- Item data not in cache yet; flag that we should retry.
+                _hadMissingLinks = true
+            end
+        end
+    end
+
+    return {
+        itemID    = itemID,
+        link      = link,
+        name      = name,
+        slot      = slot,
+        armorType = armorType,
+    }
 end
 
 local function GetQualityColoredItemText(loot)
@@ -265,6 +276,9 @@ function Spoilscribe:BuildLootLines()
     if EJ_SelectTier and initialTier then
         EJ_SelectTier(initialTier)
     end
+    if EJ_SetDifficulty and difficulty and difficulty.id then
+        EJ_SetDifficulty(difficulty.id)
+    end
 
     local lines = {}
     lines[#lines + 1] = string.format("Difficulty: %s", difficulty and difficulty.label or "Unknown")
@@ -278,14 +292,13 @@ function Spoilscribe:BuildLootLines()
         if EJ_SelectTier and initialTier then
             EJ_SelectTier(initialTier)
         end
+        if EJ_SetDifficulty and difficulty and difficulty.id then
+            EJ_SetDifficulty(difficulty.id)
+        end
 
         local selected, selectError = TrySelectInstance(dungeon.ejInstanceID)
         if selected then
             validDungeonCount = validDungeonCount + 1
-
-            if EJ_SetDifficulty and difficulty and difficulty.id then
-                EJ_SetDifficulty(difficulty.id)
-            end
 
             local dungeonItems = {}
 
@@ -300,6 +313,9 @@ function Spoilscribe:BuildLootLines()
                         tostring(encounterSelectError or "No reason provided.")
                     ))
                 else
+                    if EJ_SetDifficulty and difficulty and difficulty.id then
+                        EJ_SetDifficulty(difficulty.id)
+                    end
                     local lootIndex = 1
                     while true do
                         local loot = GetLootInfoByIndex(lootIndex, encounterID)
@@ -311,14 +327,7 @@ function Spoilscribe:BuildLootLines()
                             and LootMatchesSecondaryFilter(loot, selectedSecondaryLabel) then
                             local itemText = GetQualityColoredItemText(loot)
                             local slotText = loot.slot or "Unknown slot"
-                            local armorTypeText = loot.armorType or ""
-                            local itemLineText
-
-                            if armorTypeText ~= "" then
-                                itemLineText = string.format("  - %s (%s, %s)", itemText, slotText, armorTypeText)
-                            else
-                                itemLineText = string.format("  - %s (%s)", itemText, slotText)
-                            end
+                            local itemLineText = string.format("  - %s (%s)", itemText, slotText)
 
                             dungeonItems[#dungeonItems + 1] = {
                                 text = itemLineText,
@@ -369,6 +378,8 @@ function Spoilscribe:BuildLootLines()
 end
 
 function Spoilscribe:RefreshLoot()
+    _hadMissingLinks = false
+
     if not self.UI or not self.UI.RenderLoot then
         return
     end
@@ -406,7 +417,16 @@ end
 
 local f = CreateFrame("Frame")
 f:RegisterEvent("ADDON_LOADED")
+f:RegisterEvent("EJ_LOOT_DATA_RECIEVED")
 f:SetScript("OnEvent", function(_, event, arg1)
+    if event == "EJ_LOOT_DATA_RECIEVED" then
+        -- EJ item data has arrived; if our frame is visible, re-render so links populate.
+        if Spoilscribe.UI and Spoilscribe.UI.frame and Spoilscribe.UI.frame:IsShown() then
+            Spoilscribe:RefreshLoot()
+        end
+        return
+    end
+
     if event ~= "ADDON_LOADED" or arg1 ~= addonName then
         return
     end

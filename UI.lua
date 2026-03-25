@@ -87,22 +87,16 @@ function UI:CreateMainFrame()
     local controls = CreateFrame("Frame", nil, frame)
     controls:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -32)
     controls:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -12, -32)
-    controls:SetHeight(154)
+    controls:SetHeight(72)
 
     local difficultyLabel = CreateLabel(controls, "Difficulty")
     difficultyLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 10, -10)
 
-    local slotLabel = CreateLabel(controls, "Slot (planned filter)")
+    local slotLabel = CreateLabel(controls, "Slot")
     slotLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 210, -10)
 
-    local armorLabel = CreateLabel(controls, "Armor (planned filter)")
-    armorLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 10, -72)
-
-    local weaponLabel = CreateLabel(controls, "Weapon (planned filter)")
-    weaponLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 260, -72)
-
-    local statsLabel = CreateLabel(controls, "Secondary Stats (planned filter)")
-    statsLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 510, -72)
+    local statsLabel = CreateLabel(controls, "Secondary Stats")
+    statsLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 450, -10)
 
     local defaultDifficultyIndex = 1 -- Mythic first in table.
     frame.difficultyDropdown = BuildDropdown(
@@ -127,28 +121,6 @@ function UI:CreateMainFrame()
     )
     frame.slotDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", 184, -28)
 
-    frame.armorDropdown = BuildDropdown(
-        controls,
-        220,
-        Spoilscribe.Data.Filters.armorTypes,
-        1,
-        function(index)
-            frame.selectedArmorIndex = index
-        end
-    )
-    frame.armorDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", -16, -90)
-
-    frame.weaponDropdown = BuildDropdown(
-        controls,
-        220,
-        Spoilscribe.Data.Filters.weaponTypes,
-        1,
-        function(index)
-            frame.selectedWeaponIndex = index
-        end
-    )
-    frame.weaponDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", 234, -90)
-
     frame.secondaryDropdown = BuildDropdown(
         controls,
         220,
@@ -158,7 +130,7 @@ function UI:CreateMainFrame()
             frame.selectedSecondaryIndex = index
         end
     )
-    frame.secondaryDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", 484, -90)
+    frame.secondaryDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", 424, -28)
 
     local refreshButton = CreateFrame("Button", nil, controls, "UIPanelButtonTemplate")
     refreshButton:SetSize(130, 24)
@@ -168,12 +140,8 @@ function UI:CreateMainFrame()
         Spoilscribe:RefreshLoot()
     end)
 
-    local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    hint:SetPoint("TOPLEFT", controls, "BOTTOMLEFT", 10, 6)
-    hint:SetText("Filters are visible and stored in UI selection, but not applied yet.")
-
     local scroll = CreateFrame("ScrollFrame", "SpoilscribeLootScroll", frame, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -198)
+    scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -116)
     scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -36, 16)
 
     local content = CreateFrame("Frame", nil, scroll)
