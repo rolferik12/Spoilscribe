@@ -164,6 +164,26 @@ function UI:ToggleMainFrame()
     if frame:IsShown() then
         frame:Hide()
     else
+        -- Close the Encounter Journal if it's open.
+        if EncounterJournal and EncounterJournal:IsShown() then
+            EncounterJournal:Hide()
+        end
+
+        -- Hook EncounterJournal OnShow once so opening it closes Spoilscribe.
+        if not self._ejHooked then
+            self._ejHooked = true
+            if EncounterJournal_LoadUI then
+                pcall(EncounterJournal_LoadUI)
+            end
+            if EncounterJournal then
+                EncounterJournal:HookScript("OnShow", function()
+                    if self.frame and self.frame:IsShown() then
+                        self.frame:Hide()
+                    end
+                end)
+            end
+        end
+
         frame:Show()
         Spoilscribe:RefreshLoot()
     end

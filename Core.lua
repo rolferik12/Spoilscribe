@@ -5,6 +5,8 @@ _G[addonName] = Spoilscribe
 
 -- Tracks whether any EJ item links were missing during the last scan.
 local _hadMissingLinks = false
+-- Guard to prevent re-entrancy during scanning.
+local _isScanning = false
 SpoilscribeDB = SpoilscribeDB or {}
 
 local function EnsureEncounterJournalLoaded()
@@ -269,6 +271,13 @@ function Spoilscribe:BuildLootLines()
 
     EnsureEncounterJournalLoaded()
 
+    -- Save the current EJ state so we can restore it after our scan.
+    -- This prevents conflicts when the Encounter Journal UI is also open.
+    local savedDifficulty = EJ_GetDifficulty and EJ_GetDifficulty()
+    local savedInstanceID = EJ_GetCurrentInstance and EJ_GetCurrentInstance()
+
+    _isScanning = true
+
     local initialTier = nil
     if EJ_GetNumTiers and EJ_GetNumTiers() and EJ_GetNumTiers() > 0 then
         initialTier = EJ_GetNumTiers()
@@ -374,6 +383,19 @@ function Spoilscribe:BuildLootLines()
         lines[#lines + 1] = "No configured dungeons are currently available in Encounter Journal for this client/tier."
     end
 
+    -- Restore previous EJ state so the Encounter Journal UI isn't affected.
+    _isScanning = false
+    if savedDifficulty and EJ_SetDifficulty then
+        EJ_SetDifficulty(savedDifficulty)
+    end
+    if savedInstanceID and savedInstanceID ~= 0 and EJ_SelectInstance then
+        pcall(EJ_SelectInstance, savedInstanceID)
+        -- Re-apply difficulty since SelectInstance resets it.
+        if savedDifficulty and EJ_SetDifficulty then
+            EJ_SetDifficulty(savedDifficulty)
+        end
+    end
+
     return lines
 end
 
@@ -420,8 +442,8 @@ f:RegisterEvent("ADDON_LOADED")
 f:RegisterEvent("EJ_LOOT_DATA_RECIEVED")
 f:SetScript("OnEvent", function(_, event, arg1)
     if event == "EJ_LOOT_DATA_RECIEVED" then
-        -- EJ item data has arrived; if our frame is visible, re-render so links populate.
-        if Spoilscribe.UI and Spoilscribe.UI.frame and Spoilscribe.UI.frame:IsShown() then
+        -- EJ item data has arrived; if our frame is visible and we're not mid-scan, re-render.
+        if not _isScanning and Spoilscribe.UI and Spoilscribe.UI.frame and Spoilscribe.UI.frame:IsShown() then
             Spoilscribe:RefreshLoot()
         end
         return
