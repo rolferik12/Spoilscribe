@@ -64,47 +64,49 @@ Spoilscribe.Data.Filters = {
 -- Static encounter IDs are intentionally explicit and easy to edit.
 -- If Blizzard updates encounter IDs, adjust this table only.
 -- Midnight Season 1 dungeon rotation.
+-- To retrieve the instance ID: use /dump EJ_GetInstanceByIndex(n, false)
+-- To retrieve the encounter IDs: use /dump EJ_GetEncounterInfoByIndex(n, instanceID)
 Spoilscribe.Data.Dungeons = {
     -- New Midnight Dungeons
     {
         name = "Magisters' Terrace",
-        instanceID = 15829,
-        encounters = { 2782, 2783, 2784, 2785 },
+        ejInstanceID = 1300,
+        encounters = { 2659, 2661, 2660, 2662 },
     },
     {
         name = "Windrunner Spire",
-        instanceID = 15808,
-        encounters = { 2801, 2802, 2803, 2804 },
+        ejInstanceID = 1299,
+        encounters = { 2655, 2656, 2657, 2658 },
     },
     {
         name = "Maisara Caverns",
-        instanceID = 15842,
-        encounters = { 2815, 2816, 2817, 2818 },
+        ejInstanceID = 1305,
+        encounters = { 2810, 2811, 2812 },
     },
     {
         name = "Nexus-Point Xenas",
-        instanceID = 15855,
-        encounters = { 2830, 2831, 2832, 2833 },
+        ejInstanceID = 1316,
+        encounters = { 2813, 2814, 2815 },
     },
     -- Legacy Dungeon Rotation
     {
         name = "Algeth'ar Academy",
-        instanceID = 14032,
-        encounters = { 2512, 2513, 2514, 2515 },
+        ejInstanceID = 1201,
+        encounters = { 2509, 2512, 2495, 2514 },
     },
     {
         name = "Seat of the Triumvirate",
-        instanceID = 1753,
+        ejInstanceID = 945,
         encounters = { 1979, 1980, 1981, 1982 },
     },
     {
         name = "Skyreach",
-        instanceID = 1209,
-        encounters = { 1162, 1163, 1164, 1165 },
+        ejInstanceID = 476,
+        encounters = { 965, 966, 967, 968 },
     },
     {
         name = "Pit of Saron",
-        instanceID = 658,
-        encounters = { 605, 606, 607 },
+        ejInstanceID = 278,
+        encounters = { 608, 609, 610 },
     },
 }
