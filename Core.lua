@@ -50,39 +50,43 @@ local function LogToConsole(message)
 end
 
 local function GetLootInfoByIndex(index, encounterID)
-    local itemID, link, name, slot, armorType
+    local itemID, link, name, slot, armorType, icon, itemQuality
 
     if C_EncounterJournal and C_EncounterJournal.GetLootInfoByIndex then
         local info = C_EncounterJournal.GetLootInfoByIndex(index, encounterID)
         if info then
-            itemID    = info.itemID
-            link      = info.link
-            name      = info.name
-            slot      = info.slot
-            armorType = info.armorType
+            itemID      = info.itemID
+            link        = info.link
+            name        = info.name
+            slot        = info.slot
+            armorType   = info.armorType
+            icon        = info.icon
+            itemQuality = info.itemQuality
         end
 
         if not itemID then
             -- Some client builds expect only index after EJ_SelectEncounter.
             local fallbackInfo = C_EncounterJournal.GetLootInfoByIndex(index)
             if fallbackInfo then
-                itemID    = fallbackInfo.itemID
-                link      = fallbackInfo.link
-                name      = fallbackInfo.name
-                slot      = fallbackInfo.slot
-                armorType = fallbackInfo.armorType
+                itemID      = fallbackInfo.itemID
+                link        = fallbackInfo.link
+                name        = fallbackInfo.name
+                slot        = fallbackInfo.slot
+                armorType   = fallbackInfo.armorType
+                icon        = fallbackInfo.icon
+                itemQuality = fallbackInfo.itemQuality
             end
         end
     end
 
     if not itemID and EJ_GetLootInfoByIndex then
-        local id, _, _, n, _, s, a, l = EJ_GetLootInfoByIndex(index, encounterID)
+        local id, encounterIcon, _, n, _, s, a, l = EJ_GetLootInfoByIndex(index, encounterID)
         if id then
-            itemID = id ; link = l ; name = n ; slot = s ; armorType = a
+            itemID = id ; link = l ; name = n ; slot = s ; armorType = a ; icon = encounterIcon
         else
-            local id2, _, _, n2, _, s2, a2, l2 = EJ_GetLootInfoByIndex(index)
+            local id2, encounterIcon2, _, n2, _, s2, a2, l2 = EJ_GetLootInfoByIndex(index)
             if id2 then
-                itemID = id2 ; link = l2 ; name = n2 ; slot = s2 ; armorType = a2
+                itemID = id2 ; link = l2 ; name = n2 ; slot = s2 ; armorType = a2 ; icon = encounterIcon2
             end
         end
     end
@@ -93,22 +97,26 @@ local function GetLootInfoByIndex(index, encounterID)
     -- This also primes the client cache so a retry will get the proper link.
     if not link or link == "" then
         if GetItemInfo then
-            local _, cachedLink = GetItemInfo(itemID)
+            local _, cachedLink, _, _, _, _, _, _, _, cachedIcon = GetItemInfo(itemID)
             if cachedLink and cachedLink ~= "" then
                 link = cachedLink
             else
-                -- Item data not in cache yet; flag that we should retry.
                 _hadMissingLinks = true
+            end
+            if not icon and cachedIcon then
+                icon = cachedIcon
             end
         end
     end
 
     return {
-        itemID    = itemID,
-        link      = link,
-        name      = name,
-        slot      = slot,
-        armorType = armorType,
+        itemID      = itemID,
+        link        = link,
+        name        = name,
+        slot        = slot,
+        armorType   = armorType,
+        icon        = icon,
+        itemQuality = itemQuality,
     }
 end
 
@@ -325,6 +333,14 @@ function Spoilscribe:BuildLootLines()
                     if EJ_SetDifficulty and difficulty and difficulty.id then
                         EJ_SetDifficulty(difficulty.id)
                     end
+
+                    -- Get boss name for this encounter.
+                    local bossName = nil
+                    if EJ_GetEncounterInfo then
+                        local eName = EJ_GetEncounterInfo(encounterID)
+                        if eName then bossName = eName end
+                    end
+
                     local lootIndex = 1
                     while true do
                         local loot = GetLootInfoByIndex(lootIndex, encounterID)
@@ -334,14 +350,17 @@ function Spoilscribe:BuildLootLines()
 
                         if LootMatchesSlotFilter(loot, selectedSlotLabel)
                             and LootMatchesSecondaryFilter(loot, selectedSecondaryLabel) then
-                            local itemText = GetQualityColoredItemText(loot)
-                            local slotText = loot.slot or "Unknown slot"
-                            local itemLineText = string.format("  - %s (%s)", itemText, slotText)
 
                             dungeonItems[#dungeonItems + 1] = {
-                                text = itemLineText,
-                                itemID = loot.itemID,
-                                itemLink = loot.link,
+                                type        = "item",
+                                itemID      = loot.itemID,
+                                itemLink    = loot.link,
+                                itemName    = loot.name,
+                                itemQuality = loot.itemQuality,
+                                icon        = loot.icon,
+                                slot        = loot.slot or "",
+                                armorType   = loot.armorType or "",
+                                bossName    = bossName,
                             }
                         end
 
@@ -351,13 +370,10 @@ function Spoilscribe:BuildLootLines()
             end
 
             if #dungeonItems > 0 then
-                lines[#lines + 1] = ""
-                lines[#lines + 1] = string.format("|cffffd200Dungeon: %s|r", dungeon.name)
-                lines[#lines + 1] = "|cff808080---------------------------------------------|r"
+                lines[#lines + 1] = { type = "header", text = dungeon.name }
                 for _, item in ipairs(dungeonItems) do
                     lines[#lines + 1] = item
                 end
-                lines[#lines + 1] = ""
             end
         else
             LogToConsole(string.format(

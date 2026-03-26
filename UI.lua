@@ -70,8 +70,9 @@ function UI:CreateMainFrame()
         return nil
     end
 
+
     local frame = CreateFrame("Frame", "SpoilscribeFrame", UIParent, "BasicFrameTemplateWithInset")
-    frame:SetSize(920, 580)
+    frame:SetSize(800, 579)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
     frame:EnableMouse(true)
@@ -93,15 +94,15 @@ function UI:CreateMainFrame()
     difficultyLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 10, -10)
 
     local slotLabel = CreateLabel(controls, "Slot")
-    slotLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 210, -10)
+    slotLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 160, -10)
 
     local statsLabel = CreateLabel(controls, "Secondary Stats")
-    statsLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 450, -10)
+    statsLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 330, -10)
 
     local defaultDifficultyIndex = 1 -- Mythic first in table.
     frame.difficultyDropdown = BuildDropdown(
         controls,
-        140,
+        100,
         Spoilscribe.Data.Difficulties,
         defaultDifficultyIndex,
         function(index)
@@ -112,43 +113,94 @@ function UI:CreateMainFrame()
 
     frame.slotDropdown = BuildDropdown(
         controls,
-        220,
+        120,
         Spoilscribe.Data.Filters.slots,
         1,
         function(index)
             frame.selectedSlotIndex = index
         end
     )
-    frame.slotDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", 184, -28)
+    frame.slotDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", 134, -28)
 
     frame.secondaryDropdown = BuildDropdown(
         controls,
-        220,
+        120,
         Spoilscribe.Data.Filters.secondaryStats,
         1,
         function(index)
             frame.selectedSecondaryIndex = index
         end
     )
-    frame.secondaryDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", 424, -28)
+    frame.secondaryDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", 304, -28)
 
     local refreshButton = CreateFrame("Button", nil, controls, "UIPanelButtonTemplate")
-    refreshButton:SetSize(130, 24)
-    refreshButton:SetPoint("TOPRIGHT", controls, "TOPRIGHT", -14, -24)
+    refreshButton:SetSize(100, 24)
+    refreshButton:SetPoint("TOPRIGHT", controls, "TOPRIGHT", -10, -24)
     refreshButton:SetText("Show Loot")
     refreshButton:SetScript("OnClick", function()
         Spoilscribe:RefreshLoot()
     end)
 
-    local scroll = CreateFrame("ScrollFrame", "SpoilscribeLootScroll", frame, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -116)
-    scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -36, 16)
+    local resultArea = CreateFrame("Frame", nil, frame)
+    resultArea:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -104)
+    resultArea:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+    resultArea:SetSize(700, 375)
+    resultArea:SetFrameLevel(frame:GetFrameLevel() + 1)
 
-    local content = CreateFrame("Frame", nil, scroll)
-    content:SetSize(1, 1)
-    scroll:SetScrollChild(content)
+    local resultBg = resultArea:CreateTexture(nil, "BACKGROUND")
+    resultBg:SetAllPoints(resultArea)
+    resultBg:SetTexture("Interface/EncounterJournal/UI-EJ-JournalBG")
+    resultBg:SetTexCoord(0, 786/1024, 0, 426/512)
 
-    frame.scroll = scroll
+    local content = CreateFrame("Frame", nil, resultArea)
+    content:SetAllPoints()
+    content:SetFrameLevel(resultArea:GetFrameLevel() + 1)
+
+    -- Page navigation.
+    frame.currentPage = 1
+    frame.linesPerPage = nil -- computed at render time
+
+    local pageText = resultArea:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    pageText:SetPoint("BOTTOM", resultArea, "BOTTOM", 0, 4)
+    frame.pageText = pageText
+
+    local prevButton = CreateFrame("Button", nil, resultArea, "UIPanelButtonTemplate")
+    prevButton:SetSize(80, 22)
+    prevButton:SetPoint("BOTTOMLEFT", resultArea, "BOTTOMLEFT", 4, 2)
+    prevButton:SetText("< Prev")
+    prevButton:SetScript("OnClick", function()
+        if frame.currentPage > 1 then
+            frame.currentPage = frame.currentPage - 1
+            Spoilscribe.UI:RenderPage()
+        end
+    end)
+    frame.prevButton = prevButton
+
+    local nextButton = CreateFrame("Button", nil, resultArea, "UIPanelButtonTemplate")
+    nextButton:SetSize(80, 22)
+    nextButton:SetPoint("BOTTOMRIGHT", resultArea, "BOTTOMRIGHT", -4, 2)
+    nextButton:SetText("Next >")
+    nextButton:SetScript("OnClick", function()
+        if frame.currentPage < (frame.totalPages or 1) then
+            frame.currentPage = frame.currentPage + 1
+            Spoilscribe.UI:RenderPage()
+        end
+    end)
+    frame.nextButton = nextButton
+
+    -- Mouse wheel paging.
+    resultArea:EnableMouseWheel(true)
+    resultArea:SetScript("OnMouseWheel", function(_, delta)
+        if delta > 0 and frame.currentPage > 1 then
+            frame.currentPage = frame.currentPage - 1
+            Spoilscribe.UI:RenderPage()
+        elseif delta < 0 and frame.currentPage < (frame.totalPages or 1) then
+            frame.currentPage = frame.currentPage + 1
+            Spoilscribe.UI:RenderPage()
+        end
+    end)
+
+    frame.resultArea = resultArea
     frame.content = content
     frame.rows = {}
 
@@ -191,23 +243,102 @@ end
 
 function UI:RenderLoot(lines)
     local frame = self.frame or self:CreateMainFrame()
+    frame._lines = lines
+    frame.currentPage = 1
+    self:RenderPage()
+end
 
+function UI:RenderPage()
+    local frame = self.frame
+    if not frame or not frame._lines then return end
+
+    local lines = frame._lines
+    local ICON_SIZE = 40
+    local ITEM_ROW_HEIGHT = 62
+    local TEXT_ROW_HEIGHT = 20
+    local PAGE_BOTTOM_MARGIN = 28 -- space for page buttons
+
+    -- Hide all previous rows.
     for _, row in ipairs(frame.rows) do
         row:Hide()
-        row.text:SetText("")
-        row.itemID = nil
-        row.itemLink = nil
     end
 
-    local y = -4
+    -- Calculate available height for content.
+    local availableHeight = frame.resultArea:GetHeight() - PAGE_BOTTOM_MARGIN
+
+    -- Figure out which lines fit on each page.
+    -- Walk through all lines to find page boundaries.
+    local pages = {}
+    local currentPageLines = {}
+    local usedHeight = 4 -- initial top padding
+
     for i, line in ipairs(lines) do
+        local isItem = (type(line) == "table" and line.type == "item")
+        local rowHeight = isItem and (ITEM_ROW_HEIGHT + 2) or TEXT_ROW_HEIGHT
+
+        if usedHeight + rowHeight > availableHeight and #currentPageLines > 0 then
+            pages[#pages + 1] = currentPageLines
+            currentPageLines = {}
+            usedHeight = 4
+        end
+
+        currentPageLines[#currentPageLines + 1] = line
+        usedHeight = usedHeight + rowHeight
+    end
+    if #currentPageLines > 0 then
+        pages[#pages + 1] = currentPageLines
+    end
+
+    frame.totalPages = math.max(1, #pages)
+    if frame.currentPage > frame.totalPages then
+        frame.currentPage = frame.totalPages
+    end
+
+    -- Render only the current page's lines.
+    local pageLines = pages[frame.currentPage] or {}
+    local y = -4
+    for i, line in ipairs(pageLines) do
         local row = frame.rows[i]
         if not row then
-            row = CreateFrame("Button", nil, frame.content)
-            row:SetSize(830, 20)
-            row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-            row.text:SetAllPoints(row)
+            row = CreateFrame("Button", nil, frame.content, "BackdropTemplate")
+            row:SetSize(318, ITEM_ROW_HEIGHT)
+
+            row.bg = row:CreateTexture(nil, "BACKGROUND")
+            row.bg:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+            row.bg:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
+            row.bg:SetHeight(65)
+            row.bg:SetTexture("Interface/EncounterJournal/UI-EncounterJournalTextures")
+            row.bg:SetTexCoord(0, 320/512, 536/1024, 600/1024)
+            row.bg:Hide()
+
+            row.icon = row:CreateTexture(nil, "ARTWORK")
+            row.icon:SetSize(ICON_SIZE, ICON_SIZE)
+            row.icon:SetPoint("TOPLEFT", row, "TOPLEFT", 3, -3)
+
+            row.IconBorder = row:CreateTexture(nil, "OVERLAY")
+            row.IconBorder:SetTexture("Interface/Common/WhiteIconFrame")
+            row.IconBorder:SetSize(ICON_SIZE, ICON_SIZE)
+            row.IconBorder:SetAllPoints(row.icon)
+            row.IconBorder:Hide()
+
+            row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
+            row.text:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 11, -4)
+            row.text:SetPoint("RIGHT", row, "RIGHT", 0, 0)
             row.text:SetJustifyH("LEFT")
+            row.text:SetJustifyV("TOP")
+
+            row.slotText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
+            row.slotText:SetPoint("TOPLEFT", row.text, "BOTTOMLEFT", 0, -5)
+            row.slotText:SetJustifyH("LEFT")
+
+            row.armorText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
+            row.armorText:SetPoint("TOPRIGHT", row.text, "BOTTOMRIGHT", 0, -5)
+            row.armorText:SetJustifyH("RIGHT")
+
+            row.bossText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
+            row.bossText:SetPoint("TOPLEFT", row, "TOPLEFT", 3, -47)
+            row.bossText:SetJustifyH("LEFT")
+
             row:SetScript("OnEnter", function(self)
                 if not (self.itemLink or self.itemID) then
                     return
@@ -227,22 +358,111 @@ function UI:RenderLoot(lines)
             frame.rows[i] = row
         end
 
-        local text = line
-        if type(line) == "table" then
+        -- Reset state.
+        row.text:SetText("")
+        row.itemID = nil
+        row.itemLink = nil
+        if row.icon then row.icon:Hide() end
+        if row.IconBorder then row.IconBorder:Hide() end
+        if row.slotText then row.slotText:SetText(""); row.slotText:Hide() end
+        if row.armorText then row.armorText:SetText(""); row.armorText:Hide() end
+        if row.bossText then row.bossText:SetText(""); row.bossText:Hide() end
+
+        local text = ""
+        local showIcon = false
+        local iconTexture = nil
+        if type(line) == "table" and line.type == "header" then
+            text = "|cffffd200" .. (line.text or "") .. "|r"
+        elseif type(line) == "table" and line.type == "item" then
+            text = line.itemLink or line.itemName or ("Item " .. tostring(line.itemID))
+            row.itemID = line.itemID
+            row.itemLink = line.itemLink
+            if line.icon then
+                showIcon = true
+                iconTexture = line.icon
+            end
+        elseif type(line) == "table" then
             text = line.text or ""
             row.itemID = line.itemID
             row.itemLink = line.itemLink
         else
-            row.itemID = nil
-            row.itemLink = nil
+            text = tostring(line)
         end
 
+        if showIcon and iconTexture then
+            row.icon:SetTexture(iconTexture)
+            row.icon:Show()
+            row.bg:Show()
+            -- Quality border: WhiteIconFrame + SetVertexColor (same as Blizzard EJ).
+            local hexColor = type(line) == "table" and line.itemQuality
+            if hexColor and type(hexColor) == "string" and #hexColor == 8 then
+                local r = tonumber(hexColor:sub(3, 4), 16) / 255
+                local g = tonumber(hexColor:sub(5, 6), 16) / 255
+                local b = tonumber(hexColor:sub(7, 8), 16) / 255
+                row.IconBorder:SetVertexColor(r, g, b)
+                row.IconBorder:Show()
+            else
+                row.IconBorder:Hide()
+            end
+        else
+            row.icon:Hide()
+            row.IconBorder:Hide()
+            row.bg:Hide()
+        end
+
+        local slotLabel = ""
+        if type(line) == "table" and line.type == "item" and line.slot and line.slot ~= "" then
+            slotLabel = line.slot
+        end
+        if row.slotText then
+            row.slotText:SetText(slotLabel)
+            row.slotText:SetTextColor(75/255, 50/255, 20/255)
+            if slotLabel ~= "" then
+                row.slotText:Show()
+            else
+                row.slotText:Hide()
+            end
+        end
+
+        local armorLabel = ""
+        if type(line) == "table" and line.type == "item" and line.armorType and line.armorType ~= "" then
+            armorLabel = line.armorType
+        end
+        if row.armorText then
+            row.armorText:SetText(armorLabel)
+            row.armorText:SetTextColor(75/255, 50/255, 20/255)
+            if armorLabel ~= "" then
+                row.armorText:Show()
+            else
+                row.armorText:Hide()
+            end
+        end
+
+        local bossLabel = ""
+        if type(line) == "table" and line.type == "item" and line.bossName and line.bossName ~= "" then
+            bossLabel = "Boss: " .. line.bossName
+        end
+        if row.bossText then
+            row.bossText:SetText(bossLabel)
+            row.bossText:SetTextColor(75/255, 50/255, 20/255)
+            if bossLabel ~= "" then
+                row.bossText:Show()
+            else
+                row.bossText:Hide()
+            end
+        end
+
+        local rowHeight = showIcon and ITEM_ROW_HEIGHT or TEXT_ROW_HEIGHT
+        row:SetHeight(rowHeight)
         row:EnableMouse(row.itemID ~= nil or (row.itemLink ~= nil and row.itemLink ~= ""))
-        row:SetPoint("TOPLEFT", frame.content, "TOPLEFT", 4, y)
-        row.text:SetText(text)
+        row:SetPoint("TOPLEFT", frame.content, "TOPLEFT", 29, y)
+        row.text:SetText(text:gsub("[%[%]]", ""))
         row:Show()
-        y = y - 20
+        y = y - rowHeight - (showIcon and 2 or 0)
     end
 
-    frame.content:SetHeight(math.max(20, -y + 8))
+    -- Update page controls.
+    frame.pageText:SetText("Page " .. frame.currentPage .. " / " .. frame.totalPages)
+    frame.prevButton:SetEnabled(frame.currentPage > 1)
+    frame.nextButton:SetEnabled(frame.currentPage < frame.totalPages)
 end

@@ -114,3 +114,75 @@ end
 SLASH_SPOILSCRIBE1 = "/spoilscribe"
 SLASH_SPOILSCRIBE2 = "/ss"
 SlashCmdList.SPOILSCRIBE = OpenFromSlash
+
+SLASH_SSCLEARCACHE1 = "/ss_clearcache"
+SlashCmdList.SSCLEARCACHE = function()
+    local frame = SpoilscribeFrame
+    if frame and frame.rows then
+        for i, row in ipairs(frame.rows) do
+            row:Hide()
+        end
+        wipe(frame.rows)
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spoilscribe]|r Row cache cleared. Reopen to rebuild.")
+    else
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spoilscribe]|r No cached rows found.")
+    end
+end
+
+SLASH_SSDEBOGLOOT1 = "/ss_debugloot"
+SlashCmdList.SSDEBOGLOOT = function()
+    local function log(msg)
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SS Debug]|r " .. tostring(msg))
+    end
+
+    if EncounterJournal_LoadUI then pcall(EncounterJournal_LoadUI) end
+
+    local data = Spoilscribe.Data
+    if not data or not data.Dungeons or not data.Dungeons[1] then
+        log("No dungeon data.")
+        return
+    end
+
+    local dungeon = data.Dungeons[1]
+    local encounterID = dungeon.encounters[1]
+
+    if EJ_GetNumTiers and EJ_GetNumTiers() > 0 then
+        EJ_SelectTier(EJ_GetNumTiers())
+    end
+    EJ_SetDifficulty(23)
+    pcall(EJ_SelectInstance, dungeon.ejInstanceID)
+    pcall(EJ_SelectEncounter, encounterID)
+
+    log("Dungeon: " .. dungeon.name .. " | Encounter: " .. tostring(encounterID))
+
+    if C_EncounterJournal and C_EncounterJournal.GetLootInfoByIndex then
+        local info = C_EncounterJournal.GetLootInfoByIndex(1, encounterID)
+        if info then
+            log("--- Raw C_EncounterJournal.GetLootInfoByIndex fields ---")
+            for k, v in pairs(info) do
+                log("  " .. tostring(k) .. " = " .. tostring(v) .. "  (type: " .. type(v) .. ")")
+            end
+        else
+            log("GetLootInfoByIndex(1, encounterID) returned nil")
+            local info2 = C_EncounterJournal.GetLootInfoByIndex(1)
+            if info2 then
+                log("--- Fallback GetLootInfoByIndex(1) fields ---")
+                for k, v in pairs(info2) do
+                    log("  " .. tostring(k) .. " = " .. tostring(v) .. "  (type: " .. type(v) .. ")")
+                end
+            else
+                log("Fallback also nil")
+            end
+        end
+    else
+        log("C_EncounterJournal.GetLootInfoByIndex not available")
+    end
+
+    if EJ_GetLootInfoByIndex then
+        log("--- EJ_GetLootInfoByIndex returns ---")
+        local a, b, c, d, e, f, g, h, i, j = EJ_GetLootInfoByIndex(1, encounterID)
+        log("  1=" .. tostring(a) .. " 2=" .. tostring(b) .. " 3=" .. tostring(c))
+        log("  4=" .. tostring(d) .. " 5=" .. tostring(e) .. " 6=" .. tostring(f))
+        log("  7=" .. tostring(g) .. " 8=" .. tostring(h) .. " 9=" .. tostring(i) .. " 10=" .. tostring(j))
+    end
+end
