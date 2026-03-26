@@ -78,6 +78,8 @@ function UI:CreateMainFrame()
     frame:EnableMouse(true)
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", frame.StartMoving)
+
+    tinsert(UISpecialFrames, "SpoilscribeFrame")
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     frame:Hide()
 

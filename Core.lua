@@ -379,14 +379,69 @@ local function ScanLootForDifficulty(difficultyId)
         EncounterJournal:Show()
     end
 
-    _lootCache[difficultyId] = result
+    -- Only cache if we got items with complete details.  If the client
+    -- hasn't loaded the item data yet (common at startup) we'll have IDs
+    -- but no name/link/icon — skip caching so a retry can pick them up.
+    local totalItems = 0
+    local incompleteItems = 0
+    for _, entry in ipairs(result) do
+        for _, item in ipairs(entry.items) do
+            totalItems = totalItems + 1
+            if not item.itemName or item.itemName == ""
+                or not item.icon then
+                incompleteItems = incompleteItems + 1
+            end
+        end
+    end
+    if totalItems > 0 and incompleteItems == 0 then
+        _lootCache[difficultyId] = result
+    elseif totalItems > 0 then
+        LogToConsole(string.format(
+            "Difficulty %d: %d/%d items missing details, skipping cache.",
+            difficultyId, incompleteItems, totalItems))
+        -- Prime the client item cache so the next retry succeeds.
+        for _, entry in ipairs(result) do
+            for _, item in ipairs(entry.items) do
+                if item.itemID and GetItemInfo then
+                    GetItemInfo(item.itemID)
+                end
+            end
+        end
+    end
     return result
 end
+
+local _scanRetries = 0
+local _maxScanRetries = 5
 
 local function ScanAllDifficulties()
     EnsureEncounterJournalLoaded()
     for _, diff in ipairs(Spoilscribe.Data.Difficulties) do
         ScanLootForDifficulty(diff.id)
+    end
+
+    -- Check whether every difficulty got cached.  If any are missing the
+    -- EJ API probably wasn't ready yet — schedule a retry.
+    local allCached = true
+    for _, diff in ipairs(Spoilscribe.Data.Difficulties) do
+        if not _lootCache[diff.id] then
+            allCached = false
+            break
+        end
+    end
+
+    if not allCached and _scanRetries < _maxScanRetries then
+        _scanRetries = _scanRetries + 1
+        local delay = _scanRetries * 2  -- 2s, 4s, 6s, 8s, 10s
+        LogToConsole(string.format("Loot data incomplete, retrying in %ds (attempt %d/%d)...", delay, _scanRetries, _maxScanRetries))
+        C_Timer.After(delay, function()
+            local ok, err = pcall(ScanAllDifficulties)
+            if not ok then
+                LogToConsole("Retry scan failed: " .. tostring(err))
+            end
+        end)
+    elseif allCached then
+        LogToConsole("Loot scan complete for all difficulties.")
     end
 end
 
