@@ -162,14 +162,22 @@ function UI:CreateMainFrame()
     frame.currentPage = 1
     frame.linesPerPage = nil -- computed at render time
 
-    local pageText = resultArea:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    pageText:SetPoint("BOTTOM", resultArea, "BOTTOM", 0, 4)
-    frame.pageText = pageText
+    local nextButton = CreateFrame("Button", nil, resultArea, "UIPanelButtonTemplate")
+    nextButton:SetSize(26, 22)
+    nextButton:SetPoint("BOTTOMRIGHT", resultArea, "BOTTOMRIGHT", -25, 8)
+    nextButton:SetText(">")
+    nextButton:SetScript("OnClick", function()
+        if frame.currentPage < (frame.totalPages or 1) then
+            frame.currentPage = frame.currentPage + 1
+            Spoilscribe.UI:RenderPage()
+        end
+    end)
+    frame.nextButton = nextButton
 
     local prevButton = CreateFrame("Button", nil, resultArea, "UIPanelButtonTemplate")
-    prevButton:SetSize(80, 22)
-    prevButton:SetPoint("BOTTOMLEFT", resultArea, "BOTTOMLEFT", 4, 2)
-    prevButton:SetText("< Prev")
+    prevButton:SetSize(26, 22)
+    prevButton:SetPoint("RIGHT", nextButton, "LEFT", -2, 0)
+    prevButton:SetText("<")
     prevButton:SetScript("OnClick", function()
         if frame.currentPage > 1 then
             frame.currentPage = frame.currentPage - 1
@@ -178,17 +186,9 @@ function UI:CreateMainFrame()
     end)
     frame.prevButton = prevButton
 
-    local nextButton = CreateFrame("Button", nil, resultArea, "UIPanelButtonTemplate")
-    nextButton:SetSize(80, 22)
-    nextButton:SetPoint("BOTTOMRIGHT", resultArea, "BOTTOMRIGHT", -4, 2)
-    nextButton:SetText("Next >")
-    nextButton:SetScript("OnClick", function()
-        if frame.currentPage < (frame.totalPages or 1) then
-            frame.currentPage = frame.currentPage + 1
-            Spoilscribe.UI:RenderPage()
-        end
-    end)
-    frame.nextButton = nextButton
+    local pageText = resultArea:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    pageText:SetPoint("RIGHT", prevButton, "LEFT", -6, 0)
+    frame.pageText = pageText
 
     -- Mouse wheel paging.
     resultArea:EnableMouseWheel(true)
