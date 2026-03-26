@@ -109,6 +109,7 @@ function UI:CreateMainFrame()
         defaultDifficultyIndex,
         function(index)
             frame.selectedDifficultyIndex = index
+            Spoilscribe:RefreshLoot()
         end
     )
     frame.difficultyDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", -16, -28)
@@ -120,6 +121,7 @@ function UI:CreateMainFrame()
         1,
         function(index)
             frame.selectedSlotIndex = index
+            Spoilscribe:RefreshLoot()
         end
     )
     frame.slotDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", 134, -28)
@@ -131,17 +133,10 @@ function UI:CreateMainFrame()
         1,
         function(index)
             frame.selectedSecondaryIndex = index
+            Spoilscribe:RefreshLoot()
         end
     )
     frame.secondaryDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", 304, -28)
-
-    local refreshButton = CreateFrame("Button", nil, controls, "UIPanelButtonTemplate")
-    refreshButton:SetSize(100, 24)
-    refreshButton:SetPoint("TOPRIGHT", controls, "TOPRIGHT", -10, -24)
-    refreshButton:SetText("Show Loot")
-    refreshButton:SetScript("OnClick", function()
-        Spoilscribe:RefreshLoot()
-    end)
 
     local resultArea = CreateFrame("Frame", nil, frame)
     resultArea:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -104)
