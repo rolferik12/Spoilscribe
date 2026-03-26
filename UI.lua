@@ -92,22 +92,31 @@ function UI:CreateMainFrame()
     controls:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -12, -32)
     controls:SetHeight(72)
 
+
+    -- Calculate balanced widths and positions
+    local totalWidth = 800 - 24  -- frame width minus left/right padding
+    local colWidth = math.floor(totalWidth / 4)  -- 4 dropdowns
+    local dropdownWidth = colWidth - 24  -- leave room for dropdown chrome
+
+    local labelOffsets = { 10, 10 + colWidth, 10 + colWidth * 2, 10 + colWidth * 3 }
+    local dropdownOffsets = { -16, -16 + colWidth, -16 + colWidth * 2, -16 + colWidth * 3 }
+
     local difficultyLabel = CreateLabel(controls, "Difficulty")
-    difficultyLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 10, -10)
+    difficultyLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", labelOffsets[1], -10)
 
     local slotLabel = CreateLabel(controls, "Slot")
-    slotLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 160, -10)
+    slotLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", labelOffsets[2], -10)
 
     local statsLabel = CreateLabel(controls, "Secondary Stats")
-    statsLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 330, -10)
+    statsLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", labelOffsets[3], -10)
 
     local specLabel = CreateLabel(controls, "Loot Spec")
-    specLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 530, -10)
+    specLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", labelOffsets[4], -10)
 
     local defaultDifficultyIndex = 1 -- Mythic first in table.
     frame.difficultyDropdown = BuildDropdown(
         controls,
-        100,
+        dropdownWidth,
         Spoilscribe.Data.Difficulties,
         defaultDifficultyIndex,
         function(index)
@@ -115,11 +124,11 @@ function UI:CreateMainFrame()
             Spoilscribe:RefreshLoot()
         end
     )
-    frame.difficultyDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", -16, -28)
+    frame.difficultyDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", dropdownOffsets[1], -28)
 
     frame.slotDropdown = BuildDropdown(
         controls,
-        120,
+        dropdownWidth,
         Spoilscribe.Data.Filters.slots,
         1,
         function(index)
@@ -127,11 +136,11 @@ function UI:CreateMainFrame()
             Spoilscribe:RefreshLoot()
         end
     )
-    frame.slotDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", 134, -28)
+    frame.slotDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", dropdownOffsets[2], -28)
 
     frame.secondaryDropdown = BuildDropdown(
         controls,
-        120,
+        dropdownWidth,
         Spoilscribe.Data.Filters.secondaryStats,
         1,
         function(index)
@@ -139,7 +148,7 @@ function UI:CreateMainFrame()
             Spoilscribe:RefreshLoot()
         end
     )
-    frame.secondaryDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", 304, -28)
+    frame.secondaryDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", dropdownOffsets[3], -28)
 
     local specList = Spoilscribe:GetSpecList()
     -- Default to the player's current loot spec (or active spec if loot spec is 0).
@@ -162,7 +171,7 @@ function UI:CreateMainFrame()
     frame.selectedSpecIndex = defaultSpecIndex
     frame.specDropdown = BuildDropdown(
         controls,
-        120,
+        dropdownWidth,
         specList,
         defaultSpecIndex,
         function(index)
@@ -170,7 +179,7 @@ function UI:CreateMainFrame()
             Spoilscribe:RefreshLoot()
         end
     )
-    frame.specDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", 504, -28)
+    frame.specDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", dropdownOffsets[4], -28)
 
     local resultArea = CreateFrame("Frame", nil, frame)
     resultArea:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -104)
