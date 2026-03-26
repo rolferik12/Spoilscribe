@@ -257,36 +257,71 @@ function UI:RenderPage()
     local ITEM_ROW_HEIGHT = 62
     local TEXT_ROW_HEIGHT = 20
     local PAGE_BOTTOM_MARGIN = 28 -- space for page buttons
+    local COL_LEFT_X = 29
+    local COL_RIGHT_X = 800 - 25 - 318 -- 457
 
     -- Hide all previous rows.
     for _, row in ipairs(frame.rows) do
         row:Hide()
     end
 
+    -- Build visual rows: pair adjacent items into left/right columns.
+    -- Headers get their own full-width visual row.
+    local visualRows = {}
+    local pendingItem = nil
+
+    for _, line in ipairs(lines) do
+        local isItem = (type(line) == "table" and line.type == "item")
+        if isItem then
+            if pendingItem then
+                visualRows[#visualRows + 1] = {
+                    height = ITEM_ROW_HEIGHT + 2,
+                    entries = { {line = pendingItem, col = "left"}, {line = line, col = "right"} }
+                }
+                pendingItem = nil
+            else
+                pendingItem = line
+            end
+        else
+            if pendingItem then
+                visualRows[#visualRows + 1] = {
+                    height = ITEM_ROW_HEIGHT + 2,
+                    entries = { {line = pendingItem, col = "left"} }
+                }
+                pendingItem = nil
+            end
+            visualRows[#visualRows + 1] = {
+                height = TEXT_ROW_HEIGHT,
+                entries = { {line = line, col = "left"} }
+            }
+        end
+    end
+    if pendingItem then
+        visualRows[#visualRows + 1] = {
+            height = ITEM_ROW_HEIGHT + 2,
+            entries = { {line = pendingItem, col = "left"} }
+        }
+    end
+
     -- Calculate available height for content.
     local availableHeight = frame.resultArea:GetHeight() - PAGE_BOTTOM_MARGIN
 
-    -- Figure out which lines fit on each page.
-    -- Walk through all lines to find page boundaries.
+    -- Paginate visual rows.
     local pages = {}
-    local currentPageLines = {}
+    local currentPageRows = {}
     local usedHeight = 4 -- initial top padding
 
-    for i, line in ipairs(lines) do
-        local isItem = (type(line) == "table" and line.type == "item")
-        local rowHeight = isItem and (ITEM_ROW_HEIGHT + 2) or TEXT_ROW_HEIGHT
-
-        if usedHeight + rowHeight > availableHeight and #currentPageLines > 0 then
-            pages[#pages + 1] = currentPageLines
-            currentPageLines = {}
+    for _, vrow in ipairs(visualRows) do
+        if usedHeight + vrow.height > availableHeight and #currentPageRows > 0 then
+            pages[#pages + 1] = currentPageRows
+            currentPageRows = {}
             usedHeight = 4
         end
-
-        currentPageLines[#currentPageLines + 1] = line
-        usedHeight = usedHeight + rowHeight
+        currentPageRows[#currentPageRows + 1] = vrow
+        usedHeight = usedHeight + vrow.height
     end
-    if #currentPageLines > 0 then
-        pages[#pages + 1] = currentPageLines
+    if #currentPageRows > 0 then
+        pages[#pages + 1] = currentPageRows
     end
 
     frame.totalPages = math.max(1, #pages)
@@ -294,171 +329,179 @@ function UI:RenderPage()
         frame.currentPage = frame.totalPages
     end
 
-    -- Render only the current page's lines.
-    local pageLines = pages[frame.currentPage] or {}
+    -- Render the current page.
+    local pageRows = pages[frame.currentPage] or {}
     local y = -4
-    for i, line in ipairs(pageLines) do
-        local row = frame.rows[i]
-        if not row then
-            row = CreateFrame("Button", nil, frame.content, "BackdropTemplate")
-            row:SetSize(318, ITEM_ROW_HEIGHT)
+    local rowIndex = 0
 
-            row.bg = row:CreateTexture(nil, "BACKGROUND")
-            row.bg:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
-            row.bg:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
-            row.bg:SetHeight(65)
-            row.bg:SetTexture("Interface/EncounterJournal/UI-EncounterJournalTextures")
-            row.bg:SetTexCoord(0, 320/512, 536/1024, 600/1024)
-            row.bg:Hide()
+    for _, vrow in ipairs(pageRows) do
+        for _, entry in ipairs(vrow.entries) do
+            rowIndex = rowIndex + 1
+            local line = entry.line
+            local xOffset = (entry.col == "right") and COL_RIGHT_X or COL_LEFT_X
 
-            row.icon = row:CreateTexture(nil, "ARTWORK")
-            row.icon:SetSize(ICON_SIZE, ICON_SIZE)
-            row.icon:SetPoint("TOPLEFT", row, "TOPLEFT", 3, -3)
+            local row = frame.rows[rowIndex]
+            if not row then
+                row = CreateFrame("Button", nil, frame.content, "BackdropTemplate")
+                row:SetSize(318, ITEM_ROW_HEIGHT)
 
-            row.IconBorder = row:CreateTexture(nil, "OVERLAY")
-            row.IconBorder:SetTexture("Interface/Common/WhiteIconFrame")
-            row.IconBorder:SetSize(ICON_SIZE, ICON_SIZE)
-            row.IconBorder:SetAllPoints(row.icon)
-            row.IconBorder:Hide()
+                row.bg = row:CreateTexture(nil, "BACKGROUND")
+                row.bg:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+                row.bg:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
+                row.bg:SetHeight(65)
+                row.bg:SetTexture("Interface/EncounterJournal/UI-EncounterJournalTextures")
+                row.bg:SetTexCoord(0, 320/512, 536/1024, 600/1024)
+                row.bg:Hide()
 
-            row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
-            row.text:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 11, -4)
-            row.text:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-            row.text:SetJustifyH("LEFT")
-            row.text:SetJustifyV("TOP")
+                row.icon = row:CreateTexture(nil, "ARTWORK")
+                row.icon:SetSize(ICON_SIZE, ICON_SIZE)
+                row.icon:SetPoint("TOPLEFT", row, "TOPLEFT", 3, -3)
 
-            row.slotText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
-            row.slotText:SetPoint("TOPLEFT", row.text, "BOTTOMLEFT", 0, -5)
-            row.slotText:SetJustifyH("LEFT")
-
-            row.armorText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
-            row.armorText:SetPoint("TOPRIGHT", row.text, "BOTTOMRIGHT", 0, -5)
-            row.armorText:SetJustifyH("RIGHT")
-
-            row.bossText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
-            row.bossText:SetPoint("TOPLEFT", row, "TOPLEFT", 3, -47)
-            row.bossText:SetJustifyH("LEFT")
-
-            row:SetScript("OnEnter", function(self)
-                if not (self.itemLink or self.itemID) then
-                    return
-                end
-
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                if self.itemLink and self.itemLink ~= "" then
-                    GameTooltip:SetHyperlink(self.itemLink)
-                elseif self.itemID then
-                    GameTooltip:SetItemByID(self.itemID)
-                end
-                GameTooltip:Show()
-            end)
-            row:SetScript("OnLeave", function()
-                GameTooltip:Hide()
-            end)
-            frame.rows[i] = row
-        end
-
-        -- Reset state.
-        row.text:SetText("")
-        row.itemID = nil
-        row.itemLink = nil
-        if row.icon then row.icon:Hide() end
-        if row.IconBorder then row.IconBorder:Hide() end
-        if row.slotText then row.slotText:SetText(""); row.slotText:Hide() end
-        if row.armorText then row.armorText:SetText(""); row.armorText:Hide() end
-        if row.bossText then row.bossText:SetText(""); row.bossText:Hide() end
-
-        local text = ""
-        local showIcon = false
-        local iconTexture = nil
-        if type(line) == "table" and line.type == "header" then
-            text = "|cffffd200" .. (line.text or "") .. "|r"
-        elseif type(line) == "table" and line.type == "item" then
-            text = line.itemLink or line.itemName or ("Item " .. tostring(line.itemID))
-            row.itemID = line.itemID
-            row.itemLink = line.itemLink
-            if line.icon then
-                showIcon = true
-                iconTexture = line.icon
-            end
-        elseif type(line) == "table" then
-            text = line.text or ""
-            row.itemID = line.itemID
-            row.itemLink = line.itemLink
-        else
-            text = tostring(line)
-        end
-
-        if showIcon and iconTexture then
-            row.icon:SetTexture(iconTexture)
-            row.icon:Show()
-            row.bg:Show()
-            -- Quality border: WhiteIconFrame + SetVertexColor (same as Blizzard EJ).
-            local hexColor = type(line) == "table" and line.itemQuality
-            if hexColor and type(hexColor) == "string" and #hexColor == 8 then
-                local r = tonumber(hexColor:sub(3, 4), 16) / 255
-                local g = tonumber(hexColor:sub(5, 6), 16) / 255
-                local b = tonumber(hexColor:sub(7, 8), 16) / 255
-                row.IconBorder:SetVertexColor(r, g, b)
-                row.IconBorder:Show()
-            else
+                row.IconBorder = row:CreateTexture(nil, "OVERLAY")
+                row.IconBorder:SetTexture("Interface/Common/WhiteIconFrame")
+                row.IconBorder:SetSize(ICON_SIZE, ICON_SIZE)
+                row.IconBorder:SetAllPoints(row.icon)
                 row.IconBorder:Hide()
-            end
-        else
-            row.icon:Hide()
-            row.IconBorder:Hide()
-            row.bg:Hide()
-        end
 
-        local slotLabel = ""
-        if type(line) == "table" and line.type == "item" and line.slot and line.slot ~= "" then
-            slotLabel = line.slot
-        end
-        if row.slotText then
-            row.slotText:SetText(slotLabel)
-            row.slotText:SetTextColor(75/255, 50/255, 20/255)
-            if slotLabel ~= "" then
-                row.slotText:Show()
+                row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
+                row.text:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 11, -4)
+                row.text:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+                row.text:SetJustifyH("LEFT")
+                row.text:SetJustifyV("TOP")
+
+                row.slotText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
+                row.slotText:SetPoint("TOPLEFT", row.text, "BOTTOMLEFT", 0, -5)
+                row.slotText:SetJustifyH("LEFT")
+
+                row.armorText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
+                row.armorText:SetPoint("TOPRIGHT", row.text, "BOTTOMRIGHT", 0, -5)
+                row.armorText:SetJustifyH("RIGHT")
+
+                row.bossText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
+                row.bossText:SetPoint("TOPLEFT", row, "TOPLEFT", 3, -47)
+                row.bossText:SetJustifyH("LEFT")
+
+                row:SetScript("OnEnter", function(self)
+                    if not (self.itemLink or self.itemID) then
+                        return
+                    end
+
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    if self.itemLink and self.itemLink ~= "" then
+                        GameTooltip:SetHyperlink(self.itemLink)
+                    elseif self.itemID then
+                        GameTooltip:SetItemByID(self.itemID)
+                    end
+                    GameTooltip:Show()
+                end)
+                row:SetScript("OnLeave", function()
+                    GameTooltip:Hide()
+                end)
+                frame.rows[rowIndex] = row
+            end
+
+            -- Reset state.
+            row.text:SetText("")
+            row.itemID = nil
+            row.itemLink = nil
+            if row.icon then row.icon:Hide() end
+            if row.IconBorder then row.IconBorder:Hide() end
+            if row.slotText then row.slotText:SetText(""); row.slotText:Hide() end
+            if row.armorText then row.armorText:SetText(""); row.armorText:Hide() end
+            if row.bossText then row.bossText:SetText(""); row.bossText:Hide() end
+
+            local text = ""
+            local showIcon = false
+            local iconTexture = nil
+            if type(line) == "table" and line.type == "header" then
+                text = "|cffffd200" .. (line.text or "") .. "|r"
+            elseif type(line) == "table" and line.type == "item" then
+                text = line.itemLink or line.itemName or ("Item " .. tostring(line.itemID))
+                row.itemID = line.itemID
+                row.itemLink = line.itemLink
+                if line.icon then
+                    showIcon = true
+                    iconTexture = line.icon
+                end
+            elseif type(line) == "table" then
+                text = line.text or ""
+                row.itemID = line.itemID
+                row.itemLink = line.itemLink
             else
-                row.slotText:Hide()
+                text = tostring(line)
             end
-        end
 
-        local armorLabel = ""
-        if type(line) == "table" and line.type == "item" and line.armorType and line.armorType ~= "" then
-            armorLabel = line.armorType
-        end
-        if row.armorText then
-            row.armorText:SetText(armorLabel)
-            row.armorText:SetTextColor(75/255, 50/255, 20/255)
-            if armorLabel ~= "" then
-                row.armorText:Show()
+            if showIcon and iconTexture then
+                row.icon:SetTexture(iconTexture)
+                row.icon:Show()
+                row.bg:Show()
+                local hexColor = type(line) == "table" and line.itemQuality
+                if hexColor and type(hexColor) == "string" and #hexColor == 8 then
+                    local r = tonumber(hexColor:sub(3, 4), 16) / 255
+                    local g = tonumber(hexColor:sub(5, 6), 16) / 255
+                    local b = tonumber(hexColor:sub(7, 8), 16) / 255
+                    row.IconBorder:SetVertexColor(r, g, b)
+                    row.IconBorder:Show()
+                else
+                    row.IconBorder:Hide()
+                end
             else
-                row.armorText:Hide()
+                row.icon:Hide()
+                row.IconBorder:Hide()
+                row.bg:Hide()
             end
-        end
 
-        local bossLabel = ""
-        if type(line) == "table" and line.type == "item" and line.bossName and line.bossName ~= "" then
-            bossLabel = "Boss: " .. line.bossName
-        end
-        if row.bossText then
-            row.bossText:SetText(bossLabel)
-            row.bossText:SetTextColor(75/255, 50/255, 20/255)
-            if bossLabel ~= "" then
-                row.bossText:Show()
-            else
-                row.bossText:Hide()
+            local slotLabel = ""
+            if type(line) == "table" and line.type == "item" and line.slot and line.slot ~= "" then
+                slotLabel = line.slot
             end
-        end
+            if row.slotText then
+                row.slotText:SetText(slotLabel)
+                row.slotText:SetTextColor(75/255, 50/255, 20/255)
+                if slotLabel ~= "" then
+                    row.slotText:Show()
+                else
+                    row.slotText:Hide()
+                end
+            end
 
-        local rowHeight = showIcon and ITEM_ROW_HEIGHT or TEXT_ROW_HEIGHT
-        row:SetHeight(rowHeight)
-        row:EnableMouse(row.itemID ~= nil or (row.itemLink ~= nil and row.itemLink ~= ""))
-        row:SetPoint("TOPLEFT", frame.content, "TOPLEFT", 29, y)
-        row.text:SetText(text:gsub("[%[%]]", ""))
-        row:Show()
-        y = y - rowHeight - (showIcon and 2 or 0)
+            local armorLabel = ""
+            if type(line) == "table" and line.type == "item" and line.armorType and line.armorType ~= "" then
+                armorLabel = line.armorType
+            end
+            if row.armorText then
+                row.armorText:SetText(armorLabel)
+                row.armorText:SetTextColor(75/255, 50/255, 20/255)
+                if armorLabel ~= "" then
+                    row.armorText:Show()
+                else
+                    row.armorText:Hide()
+                end
+            end
+
+            local bossLabel = ""
+            if type(line) == "table" and line.type == "item" and line.bossName and line.bossName ~= "" then
+                bossLabel = "Boss: " .. line.bossName
+            end
+            if row.bossText then
+                row.bossText:SetText(bossLabel)
+                row.bossText:SetTextColor(75/255, 50/255, 20/255)
+                if bossLabel ~= "" then
+                    row.bossText:Show()
+                else
+                    row.bossText:Hide()
+                end
+            end
+
+            local rowHeight = showIcon and ITEM_ROW_HEIGHT or TEXT_ROW_HEIGHT
+            row:SetHeight(rowHeight)
+            row:EnableMouse(row.itemID ~= nil or (row.itemLink ~= nil and row.itemLink ~= ""))
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", frame.content, "TOPLEFT", xOffset, y)
+            row.text:SetText(text:gsub("[%[%]]", ""))
+            row:Show()
+        end
+        y = y - vrow.height
     end
 
     -- Update page controls.
