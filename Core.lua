@@ -261,6 +261,135 @@ local function LootMatchesSecondaryFilter(loot, selectedSecondaryLabel)
     return false
 end
 
+-- Loot cache: keyed by difficulty ID → array of {dungeonName, items[]}.
+-- Populated once per difficulty via ScanLootForDifficulty, then reused by
+-- BuildLootLines so the Encounter Journal is never touched while the user
+-- is interacting with it.
+local _lootCache = {}
+
+local function ScanLootForDifficulty(difficultyId)
+    if _lootCache[difficultyId] then
+        return _lootCache[difficultyId]
+    end
+
+    EnsureEncounterJournalLoaded()
+
+    local savedDifficulty = EJ_GetDifficulty and EJ_GetDifficulty()
+    local savedInstanceID = EJ_GetCurrentInstance and EJ_GetCurrentInstance()
+
+    local ejWasShown = EncounterJournal and EncounterJournal:IsShown()
+    if ejWasShown then
+        EncounterJournal:Hide()
+    end
+
+    _isScanning = true
+
+    local initialTier = nil
+    if EJ_GetNumTiers and EJ_GetNumTiers() and EJ_GetNumTiers() > 0 then
+        initialTier = EJ_GetNumTiers()
+    end
+    if EJ_SelectTier and initialTier then
+        EJ_SelectTier(initialTier)
+    end
+    if EJ_SetDifficulty and difficultyId then
+        EJ_SetDifficulty(difficultyId)
+    end
+
+    local result = {}
+
+    for _, dungeon in ipairs(Spoilscribe.Data.Dungeons) do
+        if EJ_SelectTier and initialTier then
+            EJ_SelectTier(initialTier)
+        end
+        if EJ_SetDifficulty and difficultyId then
+            EJ_SetDifficulty(difficultyId)
+        end
+
+        local selected, selectError = TrySelectInstance(dungeon.ejInstanceID)
+        if selected then
+            local dungeonEntry = { dungeonName = dungeon.name, items = {} }
+
+            for _, encounterID in ipairs(dungeon.encounters) do
+                local encounterSelected, encounterSelectError = TrySelectEncounter(encounterID)
+
+                if not encounterSelected then
+                    LogToConsole(string.format(
+                        "Encounter select failed in %s (EncounterID: %d). %s",
+                        tostring(dungeon.name),
+                        tonumber(encounterID) or 0,
+                        tostring(encounterSelectError or "No reason provided.")
+                    ))
+                else
+                    if EJ_SetDifficulty and difficultyId then
+                        EJ_SetDifficulty(difficultyId)
+                    end
+
+                    local bossName = nil
+                    if EJ_GetEncounterInfo then
+                        local eName = EJ_GetEncounterInfo(encounterID)
+                        if eName then bossName = eName end
+                    end
+
+                    local lootIndex = 1
+                    while true do
+                        local loot = GetLootInfoByIndex(lootIndex, encounterID)
+                        if not loot then break end
+
+                        dungeonEntry.items[#dungeonEntry.items + 1] = {
+                            type        = "item",
+                            itemID      = loot.itemID,
+                            itemLink    = loot.link,
+                            itemName    = loot.name,
+                            itemQuality = loot.itemQuality,
+                            icon        = loot.icon,
+                            slot        = loot.slot or "",
+                            armorType   = loot.armorType or "",
+                            bossName    = bossName,
+                        }
+
+                        lootIndex = lootIndex + 1
+                    end
+                end
+            end
+
+            if #dungeonEntry.items > 0 then
+                result[#result + 1] = dungeonEntry
+            end
+        else
+            LogToConsole(string.format(
+                "Instance select failed for %s (EJInstanceID: %d). %s",
+                tostring(dungeon.name),
+                tonumber(dungeon.ejInstanceID) or 0,
+                tostring(selectError or "No reason provided.")
+            ))
+        end
+    end
+
+    _isScanning = false
+    if savedDifficulty and EJ_SetDifficulty then
+        EJ_SetDifficulty(savedDifficulty)
+    end
+    if savedInstanceID and savedInstanceID ~= 0 and EJ_SelectInstance then
+        pcall(EJ_SelectInstance, savedInstanceID)
+        if savedDifficulty and EJ_SetDifficulty then
+            EJ_SetDifficulty(savedDifficulty)
+        end
+    end
+    if ejWasShown and EncounterJournal then
+        EncounterJournal:Show()
+    end
+
+    _lootCache[difficultyId] = result
+    return result
+end
+
+local function ScanAllDifficulties()
+    EnsureEncounterJournalLoaded()
+    for _, diff in ipairs(Spoilscribe.Data.Difficulties) do
+        ScanLootForDifficulty(diff.id)
+    end
+end
+
 function Spoilscribe:BuildLootLines()
     local frame = self.UI and self.UI.frame
     if not frame then
@@ -277,142 +406,38 @@ function Spoilscribe:BuildLootLines()
         selectedSecondaryLabel = self.Data.Filters.secondaryStats[frame.selectedSecondaryIndex or 1] or "Any Stats"
     end
 
-    EnsureEncounterJournalLoaded()
-
-    -- Save the current EJ state so we can restore it after our scan.
-    -- This prevents conflicts when the Encounter Journal UI is also open.
-    local savedDifficulty = EJ_GetDifficulty and EJ_GetDifficulty()
-    local savedInstanceID = EJ_GetCurrentInstance and EJ_GetCurrentInstance()
-
-    _isScanning = true
-
-    local initialTier = nil
-    if EJ_GetNumTiers and EJ_GetNumTiers() and EJ_GetNumTiers() > 0 then
-        initialTier = EJ_GetNumTiers()
-    end
-    if EJ_SelectTier and initialTier then
-        EJ_SelectTier(initialTier)
-    end
-    if EJ_SetDifficulty and difficulty and difficulty.id then
-        EJ_SetDifficulty(difficulty.id)
-    end
+    -- Scan (or use cache) for this difficulty.
+    local cachedDungeons = ScanLootForDifficulty(difficulty and difficulty.id or 23)
 
     local lines = {}
-    lines[#lines + 1] = string.format("Difficulty: %s", difficulty and difficulty.label or "Unknown")
-    lines[#lines + 1] = string.format("Slot Filter: %s", selectedSlotLabel)
-    lines[#lines + 1] = string.format("Secondary Filter: %s", selectedSecondaryLabel)
-    lines[#lines + 1] = "---------------------------------------------"
 
-    local validDungeonCount = 0
-
-    for _, dungeon in ipairs(self.Data.Dungeons) do
-        if EJ_SelectTier and initialTier then
-            EJ_SelectTier(initialTier)
-        end
-        if EJ_SetDifficulty and difficulty and difficulty.id then
-            EJ_SetDifficulty(difficulty.id)
-        end
-
-        local selected, selectError = TrySelectInstance(dungeon.ejInstanceID)
-        if selected then
-            validDungeonCount = validDungeonCount + 1
-
-            local dungeonItems = {}
-
-            for _, encounterID in ipairs(dungeon.encounters) do
-                local encounterSelected, encounterSelectError = TrySelectEncounter(encounterID)
-
-                if not encounterSelected then
-                    LogToConsole(string.format(
-                        "Encounter select failed in %s (EncounterID: %d). %s",
-                        tostring(dungeon.name),
-                        tonumber(encounterID) or 0,
-                        tostring(encounterSelectError or "No reason provided.")
-                    ))
-                else
-                    if EJ_SetDifficulty and difficulty and difficulty.id then
-                        EJ_SetDifficulty(difficulty.id)
-                    end
-
-                    -- Get boss name for this encounter.
-                    local bossName = nil
-                    if EJ_GetEncounterInfo then
-                        local eName = EJ_GetEncounterInfo(encounterID)
-                        if eName then bossName = eName end
-                    end
-
-                    local lootIndex = 1
-                    while true do
-                        local loot = GetLootInfoByIndex(lootIndex, encounterID)
-                        if not loot then
-                            break
-                        end
-
-                        if LootMatchesSlotFilter(loot, selectedSlotLabel)
-                            and LootMatchesSecondaryFilter(loot, selectedSecondaryLabel) then
-
-                            dungeonItems[#dungeonItems + 1] = {
-                                type        = "item",
-                                itemID      = loot.itemID,
-                                itemLink    = loot.link,
-                                itemName    = loot.name,
-                                itemQuality = loot.itemQuality,
-                                icon        = loot.icon,
-                                slot        = loot.slot or "",
-                                armorType   = loot.armorType or "",
-                                bossName    = bossName,
-                            }
-                        end
-
-                        lootIndex = lootIndex + 1
-                    end
-                end
-            end
-
-            if #dungeonItems > 0 then
-                lines[#lines + 1] = { type = "header", text = dungeon.name }
-                for _, item in ipairs(dungeonItems) do
-                    lines[#lines + 1] = item
-                end
-            end
-        else
-            LogToConsole(string.format(
-                "Instance select failed for %s (EJInstanceID: %d). %s",
-                tostring(dungeon.name),
-                tonumber(dungeon.ejInstanceID) or 0,
-                tostring(selectError or "No reason provided.")
-            ))
-
-            lines[#lines + 1] = ""
-            lines[#lines + 1] = string.format("|cffffd200Dungeon: %s|r", dungeon.name)
-            lines[#lines + 1] = "|cff808080---------------------------------------------|r"
-            lines[#lines + 1] = "  - Skipped: Encounter Journal could not select this instance ID."
-            lines[#lines + 1] = string.format("  - EJInstanceID: %d", dungeon.ejInstanceID)
-            if selectError and selectError ~= "" then
-                lines[#lines + 1] = "  - Reason: " .. selectError
-            end
-            lines[#lines + 1] = ""
-        end
-    end
-
-    if validDungeonCount == 0 then
+    if not cachedDungeons or #cachedDungeons == 0 then
         lines[#lines + 1] = "No configured dungeons are currently available in Encounter Journal for this client/tier."
+        return lines
     end
 
-    -- Restore previous EJ state so the Encounter Journal UI isn't affected.
-    _isScanning = false
-    if savedDifficulty and EJ_SetDifficulty then
-        EJ_SetDifficulty(savedDifficulty)
-    end
-    if savedInstanceID and savedInstanceID ~= 0 and EJ_SelectInstance then
-        pcall(EJ_SelectInstance, savedInstanceID)
-        -- Re-apply difficulty since SelectInstance resets it.
-        if savedDifficulty and EJ_SetDifficulty then
-            EJ_SetDifficulty(savedDifficulty)
+    for _, dungeonEntry in ipairs(cachedDungeons) do
+        local filtered = {}
+        for _, item in ipairs(dungeonEntry.items) do
+            if LootMatchesSlotFilter(item, selectedSlotLabel)
+                and LootMatchesSecondaryFilter(item, selectedSecondaryLabel) then
+                filtered[#filtered + 1] = item
+            end
+        end
+
+        if #filtered > 0 then
+            lines[#lines + 1] = { type = "header", text = dungeonEntry.dungeonName }
+            for _, item in ipairs(filtered) do
+                lines[#lines + 1] = item
+            end
         end
     end
 
     return lines
+end
+
+function Spoilscribe:InvalidateLootCache()
+    wipe(_lootCache)
 end
 
 function Spoilscribe:RefreshLoot()
@@ -455,13 +480,15 @@ end
 
 local f = CreateFrame("Frame")
 f:RegisterEvent("ADDON_LOADED")
-f:RegisterEvent("EJ_LOOT_DATA_RECIEVED")
+f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:SetScript("OnEvent", function(_, event, arg1)
-    if event == "EJ_LOOT_DATA_RECIEVED" then
-        -- EJ item data has arrived; if our frame is visible and we're not mid-scan, re-render.
-        if not _isScanning and Spoilscribe.UI and Spoilscribe.UI.frame and Spoilscribe.UI.frame:IsShown() then
-            Spoilscribe:RefreshLoot()
+    if event == "PLAYER_ENTERING_WORLD" then
+        -- Scan all difficulties up front so the EJ is never needed again.
+        local ok, err = pcall(ScanAllDifficulties)
+        if not ok then
+            LogToConsole("Initial loot scan failed: " .. tostring(err))
         end
+        f:UnregisterEvent("PLAYER_ENTERING_WORLD")
         return
     end
 

@@ -256,6 +256,7 @@ function UI:RenderPage()
     local ICON_SIZE = 40
     local ITEM_ROW_HEIGHT = 62
     local TEXT_ROW_HEIGHT = 20
+    local HEADER_ROW_HEIGHT = 96
     local PAGE_BOTTOM_MARGIN = 28 -- space for page buttons
     local COL_LEFT_X = 29
     local COL_RIGHT_X = 800 - 25 - 318 -- 457
@@ -272,6 +273,7 @@ function UI:RenderPage()
 
     for _, line in ipairs(lines) do
         local isItem = (type(line) == "table" and line.type == "item")
+        local isHeader = (type(line) == "table" and line.type == "header")
         if isItem then
             if pendingItem then
                 visualRows[#visualRows + 1] = {
@@ -291,7 +293,7 @@ function UI:RenderPage()
                 pendingItem = nil
             end
             visualRows[#visualRows + 1] = {
-                height = TEXT_ROW_HEIGHT,
+                height = isHeader and HEADER_ROW_HEIGHT or TEXT_ROW_HEIGHT,
                 entries = { {line = line, col = "left"} }
             }
         end
@@ -309,13 +311,13 @@ function UI:RenderPage()
     -- Paginate visual rows.
     local pages = {}
     local currentPageRows = {}
-    local usedHeight = 4 -- initial top padding
+    local usedHeight = 50 -- initial top padding
 
     for _, vrow in ipairs(visualRows) do
         if usedHeight + vrow.height > availableHeight and #currentPageRows > 0 then
             pages[#pages + 1] = currentPageRows
             currentPageRows = {}
-            usedHeight = 4
+            usedHeight = 50
         end
         currentPageRows[#currentPageRows + 1] = vrow
         usedHeight = usedHeight + vrow.height
@@ -331,7 +333,7 @@ function UI:RenderPage()
 
     -- Render the current page.
     local pageRows = pages[frame.currentPage] or {}
-    local y = -4
+    local y = -50
     local rowIndex = 0
 
     for _, vrow in ipairs(pageRows) do
@@ -381,6 +383,22 @@ function UI:RenderPage()
                 row.bossText:SetPoint("TOPLEFT", row, "TOPLEFT", 3, -47)
                 row.bossText:SetJustifyH("LEFT")
 
+                row.headerLine = row:CreateTexture(nil, "ARTWORK")
+                row.headerLine:SetAtlas("spellbook-divider")
+                row.headerLine:SetSize(335, 11)
+                row.headerLine:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 15)
+                row.headerLine:Hide()
+
+                row.headerBg = row:CreateTexture(nil, "BACKGROUND")
+                row.headerBg:SetAtlas("spellbook-list-backplate")
+                row.headerBg:SetSize(316, 90)
+                row.headerBg:SetPoint("TOPLEFT", row, "TOPLEFT", -40, 0)
+                row.headerBg:Hide()
+
+                row.headerText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+                row.headerText:SetJustifyH("LEFT")
+                row.headerText:Hide()
+
                 row:SetScript("OnEnter", function(self)
                     if not (self.itemLink or self.itemID) then
                         return
@@ -409,12 +427,17 @@ function UI:RenderPage()
             if row.slotText then row.slotText:SetText(""); row.slotText:Hide() end
             if row.armorText then row.armorText:SetText(""); row.armorText:Hide() end
             if row.bossText then row.bossText:SetText(""); row.bossText:Hide() end
+            if row.headerLine then row.headerLine:Hide() end
+            if row.headerBg then row.headerBg:Hide() end
+            if row.headerText then row.headerText:SetText(""); row.headerText:Hide() end
 
             local text = ""
             local showIcon = false
             local iconTexture = nil
-            if type(line) == "table" and line.type == "header" then
-                text = "|cffffd200" .. (line.text or "") .. "|r"
+            local isHeader = (type(line) == "table" and line.type == "header")
+            if isHeader then
+                text = line.text or ""
+                if row.headerLine then row.headerLine:Show() end
             elseif type(line) == "table" and line.type == "item" then
                 text = line.itemLink or line.itemName or ("Item " .. tostring(line.itemID))
                 row.itemID = line.itemID
@@ -494,10 +517,40 @@ function UI:RenderPage()
             end
 
             local rowHeight = showIcon and ITEM_ROW_HEIGHT or TEXT_ROW_HEIGHT
-            row:SetHeight(rowHeight)
+
+            -- Headers span both columns and position text from the row edge.
+            row.text:ClearAllPoints()
+            if isHeader then
+                rowHeight = HEADER_ROW_HEIGHT
+                row:SetSize(COL_RIGHT_X - COL_LEFT_X + 318, rowHeight)
+                -- Use dedicated header font/bg instead of row.text
+                if row.headerBg then row.headerBg:Show() end
+                if row.headerLine then row.headerLine:Show() end
+                if row.headerText then
+                    row.headerText:ClearAllPoints()
+                    row.headerText:SetPoint("TOPLEFT", row, "TOPLEFT", 10, 0)
+                    row.headerText:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+                    row.headerText:SetPoint("BOTTOM", row.headerBg, "BOTTOM", 0, 0)
+                    local font, _, flags = row.headerText:GetFont()
+                    row.headerText:SetFont(font, 20, flags)
+                    row.headerText:SetText(text:gsub("[%[%]]", ""))
+                    row.headerText:SetTextColor(75/255, 50/255, 20/255)
+                    row.headerText:Show()
+                end
+                row.text:SetText("")
+            else
+                row:SetSize(318, rowHeight)
+                row.text:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 11, -4)
+                row.text:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+            end
+
             row:EnableMouse(row.itemID ~= nil or (row.itemLink ~= nil and row.itemLink ~= ""))
             row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", frame.content, "TOPLEFT", xOffset, y)
+            if isHeader then
+                row:SetPoint("TOPLEFT", frame.content, "TOPLEFT", COL_LEFT_X, y)
+            else
+                row:SetPoint("TOPLEFT", frame.content, "TOPLEFT", xOffset, y)
+            end
             row.text:SetText(text:gsub("[%[%]]", ""))
             row:Show()
         end
