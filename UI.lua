@@ -266,64 +266,61 @@ function UI:RenderPage()
         row:Hide()
     end
 
-    -- Build visual rows: pair adjacent items into left/right columns.
-    -- Headers get their own full-width visual row.
-    local visualRows = {}
-    local pendingItem = nil
+    -- Build columns: each dungeon starts a new column.
+    -- A column = header + items stacked vertically.
+    -- If a dungeon overflows one column, a continuation column is created (no header).
+    local TOP_PADDING = 10
+    local availableHeight = frame.resultArea:GetHeight() - PAGE_BOTTOM_MARGIN
+    local colHeight = availableHeight - TOP_PADDING
+
+    local columns = {}  -- each entry: { entries = { {line=, isHeader=bool} }, height = N }
 
     for _, line in ipairs(lines) do
         local isItem = (type(line) == "table" and line.type == "item")
         local isHeader = (type(line) == "table" and line.type == "header")
-        if isItem then
-            if pendingItem then
-                visualRows[#visualRows + 1] = {
-                    height = ITEM_ROW_HEIGHT + 2,
-                    entries = { {line = pendingItem, col = "left"}, {line = line, col = "right"} }
-                }
-                pendingItem = nil
-            else
-                pendingItem = line
+
+        if isHeader then
+            -- Start a new column for this dungeon.
+            columns[#columns + 1] = { entries = {}, height = 0 }
+            local col = columns[#columns]
+            col.entries[#col.entries + 1] = { line = line, isHeader = true }
+            col.height = col.height + HEADER_ROW_HEIGHT
+        elseif isItem then
+            -- Ensure there is a current column.
+            if #columns == 0 then
+                columns[#columns + 1] = { entries = {}, height = 0 }
             end
+            local col = columns[#columns]
+            local itemH = ITEM_ROW_HEIGHT + 2
+            -- If adding this item would overflow, start a continuation column.
+            if col.height + itemH > colHeight and #col.entries > 0 then
+                columns[#columns + 1] = { entries = {}, height = 0 }
+                col = columns[#columns]
+            end
+            col.entries[#col.entries + 1] = { line = line, isHeader = false }
+            col.height = col.height + itemH
         else
-            if pendingItem then
-                visualRows[#visualRows + 1] = {
-                    height = ITEM_ROW_HEIGHT + 2,
-                    entries = { {line = pendingItem, col = "left"} }
-                }
-                pendingItem = nil
+            -- Plain text lines (non-header, non-item) — skip or place in current column.
+            if #columns == 0 then
+                columns[#columns + 1] = { entries = {}, height = 0 }
             end
-            visualRows[#visualRows + 1] = {
-                height = isHeader and HEADER_ROW_HEIGHT or TEXT_ROW_HEIGHT,
-                entries = { {line = line, col = "left"} }
-            }
+            local col = columns[#columns]
+            col.entries[#col.entries + 1] = { line = line, isHeader = false }
+            col.height = col.height + TEXT_ROW_HEIGHT
         end
     end
-    if pendingItem then
-        visualRows[#visualRows + 1] = {
-            height = ITEM_ROW_HEIGHT + 2,
-            entries = { {line = pendingItem, col = "left"} }
-        }
-    end
 
-    -- Calculate available height for content.
-    local availableHeight = frame.resultArea:GetHeight() - PAGE_BOTTOM_MARGIN
-
-    -- Paginate visual rows.
-    local pages = {}
-    local currentPageRows = {}
-    local usedHeight = 50 -- initial top padding
-
-    for _, vrow in ipairs(visualRows) do
-        if usedHeight + vrow.height > availableHeight and #currentPageRows > 0 then
-            pages[#pages + 1] = currentPageRows
-            currentPageRows = {}
-            usedHeight = 50
+    -- Paginate: 2 columns per page (left + right).
+    local pages = {}  -- each page: { col1, col2 } or { col1 }
+    local i = 1
+    while i <= #columns do
+        local page = { columns[i] }
+        i = i + 1
+        if i <= #columns then
+            page[2] = columns[i]
+            i = i + 1
         end
-        currentPageRows[#currentPageRows + 1] = vrow
-        usedHeight = usedHeight + vrow.height
-    end
-    if #currentPageRows > 0 then
-        pages[#pages + 1] = currentPageRows
+        pages[#pages + 1] = page
     end
 
     frame.totalPages = math.max(1, #pages)
@@ -331,16 +328,18 @@ function UI:RenderPage()
         frame.currentPage = frame.totalPages
     end
 
-    -- Render the current page.
-    local pageRows = pages[frame.currentPage] or {}
-    local y = -50
+    -- Render the current page's columns.
+    local pageCols = pages[frame.currentPage] or {}
     local rowIndex = 0
 
-    for _, vrow in ipairs(pageRows) do
-        for _, entry in ipairs(vrow.entries) do
+    for colIdx, col in ipairs(pageCols) do
+        local xOffset = (colIdx == 1) and COL_LEFT_X or COL_RIGHT_X
+        local hasHeader = (#col.entries > 0 and col.entries[1].isHeader)
+        local y = hasHeader and -TOP_PADDING or -42
+
+        for _, entry in ipairs(col.entries) do
             rowIndex = rowIndex + 1
             local line = entry.line
-            local xOffset = (entry.col == "right") and COL_RIGHT_X or COL_LEFT_X
 
             local row = frame.rows[rowIndex]
             if not row then
@@ -376,7 +375,7 @@ function UI:RenderPage()
                 row.slotText:SetJustifyH("LEFT")
 
                 row.armorText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
-                row.armorText:SetPoint("TOPRIGHT", row.text, "BOTTOMRIGHT", 0, -5)
+                row.armorText:SetPoint("TOPRIGHT", row.text, "BOTTOMRIGHT", -20, -5)
                 row.armorText:SetJustifyH("RIGHT")
 
                 row.bossText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
@@ -518,11 +517,11 @@ function UI:RenderPage()
 
             local rowHeight = showIcon and ITEM_ROW_HEIGHT or TEXT_ROW_HEIGHT
 
-            -- Headers span both columns and position text from the row edge.
+            -- Headers span the column width and position text from the row edge.
             row.text:ClearAllPoints()
             if isHeader then
                 rowHeight = HEADER_ROW_HEIGHT
-                row:SetSize(COL_RIGHT_X - COL_LEFT_X + 318, rowHeight)
+                row:SetSize(318, rowHeight)
                 -- Use dedicated header font/bg instead of row.text
                 if row.headerBg then row.headerBg:Show() end
                 if row.headerLine then row.headerLine:Show() end
@@ -546,15 +545,11 @@ function UI:RenderPage()
 
             row:EnableMouse(row.itemID ~= nil or (row.itemLink ~= nil and row.itemLink ~= ""))
             row:ClearAllPoints()
-            if isHeader then
-                row:SetPoint("TOPLEFT", frame.content, "TOPLEFT", COL_LEFT_X, y)
-            else
-                row:SetPoint("TOPLEFT", frame.content, "TOPLEFT", xOffset, y)
-            end
+            row:SetPoint("TOPLEFT", frame.content, "TOPLEFT", xOffset, y)
             row.text:SetText(text:gsub("[%[%]]", ""))
             row:Show()
+            y = y - rowHeight
         end
-        y = y - vrow.height
     end
 
     -- Update page controls.
