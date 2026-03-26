@@ -9,6 +9,26 @@ local _hadMissingLinks = false
 local _isScanning = false
 SpoilscribeDB = SpoilscribeDB or {}
 
+-- Build the player's specialization list at runtime.
+-- Returns an array: { {label="All Specs", classID=0, specID=0}, {label="Frost", classID=6, specID=251}, ... }
+local _specList = nil
+function Spoilscribe:GetSpecList()
+    if _specList then return _specList end
+    _specList = { { label = "All Specs", classID = 0, specID = 0 } }
+    local numSpecs = GetNumSpecializations and GetNumSpecializations() or 0
+    for i = 1, numSpecs do
+        local id, name, _, icon, _, classID = GetSpecializationInfo(i)
+        if id and name then
+            _specList[#_specList + 1] = {
+                label   = name,
+                classID = classID or select(3, UnitClass("player")),
+                specID  = id,
+            }
+        end
+    end
+    return _specList
+end
+
 local function EnsureEncounterJournalLoaded()
     if not EncounterJournal then
         EncounterJournal_LoadUI()
@@ -261,15 +281,20 @@ local function LootMatchesSecondaryFilter(loot, selectedSecondaryLabel)
     return false
 end
 
--- Loot cache: keyed by difficulty ID → array of {dungeonName, items[]}.
--- Populated once per difficulty via ScanLootForDifficulty, then reused by
+-- Loot cache: keyed by "difficultyId:specId" → array of {dungeonName, items[]}.
+-- Populated once per combo via ScanLootForDifficultyAndSpec, then reused by
 -- BuildLootLines so the Encounter Journal is never touched while the user
 -- is interacting with it.
 local _lootCache = {}
 
-local function ScanLootForDifficulty(difficultyId)
-    if _lootCache[difficultyId] then
-        return _lootCache[difficultyId]
+local function CacheKey(difficultyId, specId)
+    return tostring(difficultyId) .. ":" .. tostring(specId or 0)
+end
+
+local function ScanLootForDifficultyAndSpec(difficultyId, classId, specId)
+    local key = CacheKey(difficultyId, specId)
+    if _lootCache[key] then
+        return _lootCache[key]
     end
 
     EnsureEncounterJournalLoaded()
@@ -293,6 +318,13 @@ local function ScanLootForDifficulty(difficultyId)
     end
     if EJ_SetDifficulty and difficultyId then
         EJ_SetDifficulty(difficultyId)
+    end
+
+    -- Set loot spec filter.  specId 0 = all specs (no filter).
+    if EJ_SetLootFilter and classId and classId > 0 and specId and specId > 0 then
+        EJ_SetLootFilter(classId, specId)
+    elseif EJ_ResetLootFilter then
+        EJ_ResetLootFilter()
     end
 
     local result = {}
@@ -394,11 +426,11 @@ local function ScanLootForDifficulty(difficultyId)
         end
     end
     if totalItems > 0 and incompleteItems == 0 then
-        _lootCache[difficultyId] = result
+        _lootCache[key] = result
     elseif totalItems > 0 then
         LogToConsole(string.format(
-            "Difficulty %d: %d/%d items missing details, skipping cache.",
-            difficultyId, incompleteItems, totalItems))
+            "Difficulty %d / Spec %d: %d/%d items missing details, skipping cache.",
+            difficultyId, specId or 0, incompleteItems, totalItems))
         -- Prime the client item cache so the next retry succeeds.
         for _, entry in ipairs(result) do
             for _, item in ipairs(entry.items) do
@@ -414,34 +446,39 @@ end
 local _scanRetries = 0
 local _maxScanRetries = 5
 
-local function ScanAllDifficulties()
+local function ScanAllCombinations()
     EnsureEncounterJournalLoaded()
+    local specs = Spoilscribe:GetSpecList()
     for _, diff in ipairs(Spoilscribe.Data.Difficulties) do
-        ScanLootForDifficulty(diff.id)
+        for _, spec in ipairs(specs) do
+            ScanLootForDifficultyAndSpec(diff.id, spec.classID, spec.specID)
+        end
     end
 
-    -- Check whether every difficulty got cached.  If any are missing the
-    -- EJ API probably wasn't ready yet — schedule a retry.
+    -- Check whether every combination got cached.
     local allCached = true
     for _, diff in ipairs(Spoilscribe.Data.Difficulties) do
-        if not _lootCache[diff.id] then
-            allCached = false
-            break
+        for _, spec in ipairs(specs) do
+            if not _lootCache[CacheKey(diff.id, spec.specID)] then
+                allCached = false
+                break
+            end
         end
+        if not allCached then break end
     end
 
     if not allCached and _scanRetries < _maxScanRetries then
         _scanRetries = _scanRetries + 1
-        local delay = _scanRetries * 2  -- 2s, 4s, 6s, 8s, 10s
+        local delay = _scanRetries * 2
         LogToConsole(string.format("Loot data incomplete, retrying in %ds (attempt %d/%d)...", delay, _scanRetries, _maxScanRetries))
         C_Timer.After(delay, function()
-            local ok, err = pcall(ScanAllDifficulties)
+            local ok, err = pcall(ScanAllCombinations)
             if not ok then
                 LogToConsole("Retry scan failed: " .. tostring(err))
             end
         end)
     elseif allCached then
-        LogToConsole("Loot scan complete for all difficulties.")
+        LogToConsole("Loot scan complete for all difficulties and specs.")
     end
 end
 
@@ -461,8 +498,12 @@ function Spoilscribe:BuildLootLines()
         selectedSecondaryLabel = self.Data.Filters.secondaryStats[frame.selectedSecondaryIndex or 1] or "Any Stats"
     end
 
-    -- Scan (or use cache) for this difficulty.
-    local cachedDungeons = ScanLootForDifficulty(difficulty and difficulty.id or 23)
+    local specs = self:GetSpecList()
+    local selectedSpec = specs[frame.selectedSpecIndex or 1] or specs[1]
+
+    -- Scan (or use cache) for this difficulty + spec.
+    local diffId = difficulty and difficulty.id or 23
+    local cachedDungeons = ScanLootForDifficultyAndSpec(diffId, selectedSpec.classID, selectedSpec.specID)
 
     local lines = {}
 
@@ -538,8 +579,8 @@ f:RegisterEvent("ADDON_LOADED")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:SetScript("OnEvent", function(_, event, arg1)
     if event == "PLAYER_ENTERING_WORLD" then
-        -- Scan all difficulties up front so the EJ is never needed again.
-        local ok, err = pcall(ScanAllDifficulties)
+        -- Scan all difficulty+spec combos up front so the EJ is never needed again.
+        local ok, err = pcall(ScanAllCombinations)
         if not ok then
             LogToConsole("Initial loot scan failed: " .. tostring(err))
         end

@@ -101,6 +101,9 @@ function UI:CreateMainFrame()
     local statsLabel = CreateLabel(controls, "Secondary Stats")
     statsLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 330, -10)
 
+    local specLabel = CreateLabel(controls, "Loot Spec")
+    specLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", 530, -10)
+
     local defaultDifficultyIndex = 1 -- Mythic first in table.
     frame.difficultyDropdown = BuildDropdown(
         controls,
@@ -137,6 +140,37 @@ function UI:CreateMainFrame()
         end
     )
     frame.secondaryDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", 304, -28)
+
+    local specList = Spoilscribe:GetSpecList()
+    -- Default to the player's current loot spec (or active spec if loot spec is 0).
+    local defaultSpecIndex = 1
+    local lootSpecID = GetLootSpecialization and GetLootSpecialization() or 0
+    if lootSpecID == 0 then
+        local currentSpec = GetSpecialization and GetSpecialization() or 0
+        if currentSpec > 0 and GetSpecializationInfo then
+            lootSpecID = GetSpecializationInfo(currentSpec) or 0
+        end
+    end
+    if lootSpecID > 0 then
+        for i, spec in ipairs(specList) do
+            if spec.specID == lootSpecID then
+                defaultSpecIndex = i
+                break
+            end
+        end
+    end
+    frame.selectedSpecIndex = defaultSpecIndex
+    frame.specDropdown = BuildDropdown(
+        controls,
+        120,
+        specList,
+        defaultSpecIndex,
+        function(index)
+            frame.selectedSpecIndex = index
+            Spoilscribe:RefreshLoot()
+        end
+    )
+    frame.specDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", 504, -28)
 
     local resultArea = CreateFrame("Frame", nil, frame)
     resultArea:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -104)
