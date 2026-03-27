@@ -428,9 +428,9 @@ local function ScanLootForDifficultyAndSpec(difficultyId, classId, specId)
     if totalItems > 0 and incompleteItems == 0 then
         _lootCache[key] = result
     elseif totalItems > 0 then
-        LogToConsole(string.format(
-            "Difficulty %d / Spec %d: %d/%d items missing details, skipping cache.",
-            difficultyId, specId or 0, incompleteItems, totalItems))
+        -- LogToConsole(string.format(
+        --     "Difficulty %d / Spec %d: %d/%d items missing details, skipping cache.",
+        --     difficultyId, specId or 0, incompleteItems, totalItems))
         -- Prime the client item cache so the next retry succeeds.
         for _, entry in ipairs(result) do
             for _, item in ipairs(entry.items) do
@@ -470,7 +470,7 @@ local function ScanAllCombinations()
     if not allCached and _scanRetries < _maxScanRetries then
         _scanRetries = _scanRetries + 1
         local delay = _scanRetries * 2
-        LogToConsole(string.format("Loot data incomplete, retrying in %ds (attempt %d/%d)...", delay, _scanRetries, _maxScanRetries))
+        -- LogToConsole(string.format("Loot data incomplete, retrying in %ds (attempt %d/%d)...", delay, _scanRetries, _maxScanRetries))
         C_Timer.After(delay, function()
             local ok, err = pcall(ScanAllCombinations)
             if not ok then
