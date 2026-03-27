@@ -4,6 +4,7 @@
 ## Author: You
 ## Version: 0.1.0
 ## SavedVariables: SpoilscribeDB
+## SavedVariablesPerCharacter: SpoilscribeCharDB
 
 Bootstrap.lua
 Data.lua

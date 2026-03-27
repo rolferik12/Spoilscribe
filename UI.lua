@@ -421,8 +421,8 @@ function UI:CreateMainFrame()
     slideOut._bg = slideOutBg
 
     function slideOut:UpdateBackground()
-        SpoilscribeDB.favorites = SpoilscribeDB.favorites or {}
-        local hasFavorites = next(SpoilscribeDB.favorites) ~= nil
+        SpoilscribeCharDB.favorites = SpoilscribeCharDB.favorites or {}
+        local hasFavorites = next(SpoilscribeCharDB.favorites) ~= nil
         if hasFavorites then
             self._bg:SetAtlas("QuestLog-main-background")
         else
@@ -699,9 +699,9 @@ function UI:RenderPage()
                 row.favBtn:SetScript("OnClick", function(self)
                     local id = self:GetParent().itemID
                     if not id then return end
-                    SpoilscribeDB.favorites = SpoilscribeDB.favorites or {}
-                    if SpoilscribeDB.favorites[id] then
-                        SpoilscribeDB.favorites[id] = nil
+                    SpoilscribeCharDB.favorites = SpoilscribeCharDB.favorites or {}
+                    if SpoilscribeCharDB.favorites[id] then
+                        SpoilscribeCharDB.favorites[id] = nil
                         self:GetNormalTexture():SetDesaturated(true)
                         self:GetNormalTexture():SetAlpha(0.3)
                         -- If the unfavorited item was pinned, return to normal view.
@@ -709,7 +709,7 @@ function UI:RenderPage()
                             Spoilscribe:RefreshLoot()
                         end
                     else
-                        SpoilscribeDB.favorites[id] = true
+                        SpoilscribeCharDB.favorites[id] = true
                         self:GetNormalTexture():SetDesaturated(false)
                         self:GetNormalTexture():SetAlpha(1)
                     end
@@ -861,8 +861,8 @@ function UI:RenderPage()
             -- Update favorite button.
             if row.favBtn then
                 if row.itemID then
-                    SpoilscribeDB.favorites = SpoilscribeDB.favorites or {}
-                    if SpoilscribeDB.favorites[row.itemID] then
+                    SpoilscribeCharDB.favorites = SpoilscribeCharDB.favorites or {}
+                    if SpoilscribeCharDB.favorites[row.itemID] then
                         row.favBtn:GetNormalTexture():SetDesaturated(false)
                         row.favBtn:GetNormalTexture():SetAlpha(1)
                     else
