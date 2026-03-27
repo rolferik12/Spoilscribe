@@ -216,31 +216,64 @@ local function LootMatchesSlotFilter(loot, selectedSlotLabel)
     return false
 end
 
+local function GetItemStatTable(itemRef)
+    if not itemRef then
+        return nil
+    end
+
+    if C_Item and C_Item.GetItemStats then
+        local cStats = C_Item.GetItemStats(itemRef)
+        if cStats then
+            return cStats
+        end
+    end
+
+    if GetItemStats then
+        local stats = GetItemStats(itemRef)
+        if stats then
+            return stats
+        end
+    end
+
+    return nil
+end
+
+local _secondaryStatTokens = {
+    { token = "CRIT",         label = "critical strike" },
+    { token = "CRITICAL",     label = "critical strike" },
+    { token = "HASTE",        label = "haste" },
+    { token = "MASTERY",      label = "mastery" },
+    { token = "VERSATILITY",  label = "versatility" },
+}
+
+local function GetSecondaryStatLabels(loot)
+    if not loot then return nil end
+    local stats = GetItemStatTable(loot.link)
+    if not stats and loot.itemID then
+        stats = GetItemStatTable("item:" .. tostring(loot.itemID))
+    end
+    if not stats then return nil end
+
+    local labels = {}
+    local seen = {}
+    for statKey, statValue in pairs(stats) do
+        if statValue and statValue ~= 0 then
+            local upperKey = string.upper(tostring(statKey))
+            for _, entry in ipairs(_secondaryStatTokens) do
+                if not seen[entry.label] and string.find(upperKey, entry.token, 1, true) then
+                    labels[#labels + 1] = entry.label
+                    seen[entry.label] = true
+                end
+            end
+        end
+    end
+    if #labels > 0 then return labels end
+    return nil
+end
+
 local function LootMatchesSecondaryFilter(loot, selectedSecondaryLabel)
     if not selectedSecondaryLabel or selectedSecondaryLabel == "Any Stats" then
         return true
-    end
-
-    local function GetItemStatTable(itemRef)
-        if not itemRef then
-            return nil
-        end
-
-        if C_Item and C_Item.GetItemStats then
-            local cStats = C_Item.GetItemStats(itemRef)
-            if cStats then
-                return cStats
-            end
-        end
-
-        if GetItemStats then
-            local stats = GetItemStats(itemRef)
-            if stats then
-                return stats
-            end
-        end
-
-        return nil
     end
 
     local stats = nil
@@ -502,6 +535,8 @@ function Spoilscribe:BuildLootLines()
     local selectedSpec = specs[frame.selectedSpecIndex or 1] or specs[1]
 
     -- Scan (or use cache) for this difficulty + spec.
+    local searchText = frame.searchText and frame.searchText ~= "" and string.lower(frame.searchText) or nil
+
     local diffId = difficulty and difficulty.id or 23
     local cachedDungeons = ScanLootForDifficultyAndSpec(diffId, selectedSpec.classID, selectedSpec.specID)
 
@@ -516,7 +551,26 @@ function Spoilscribe:BuildLootLines()
         local filtered = {}
         for _, item in ipairs(dungeonEntry.items) do
             if LootMatchesSlotFilter(item, selectedSlotLabel)
-                and LootMatchesSecondaryFilter(item, selectedSecondaryLabel) then
+                and LootMatchesSecondaryFilter(item, selectedSecondaryLabel)
+                and (not searchText
+                     or (function()
+                         local sf = SpoilscribeDB.searchFields or {}
+                         if sf.itemName ~= false and item.itemName and string.find(string.lower(item.itemName), searchText, 1, true) then return true end
+                         if sf.bossName ~= false and item.bossName and string.find(string.lower(item.bossName), searchText, 1, true) then return true end
+                         if sf.slot ~= false and item.slot and string.find(string.lower(item.slot), searchText, 1, true) then return true end
+                         if sf.armorType ~= false and item.armorType and string.find(string.lower(item.armorType), searchText, 1, true) then return true end
+                         if sf.dungeonName ~= false and dungeonEntry.dungeonName and string.find(string.lower(dungeonEntry.dungeonName), searchText, 1, true) then return true end
+                         if sf.secondaryStats ~= false then
+                             local statLabels = GetSecondaryStatLabels(item)
+                             if statLabels then
+                                 for _, lbl in ipairs(statLabels) do
+                                     if string.find(lbl, searchText, 1, true) then return true end
+                                 end
+                             end
+                         end
+                         return false
+                     end)())
+                then
                 filtered[#filtered + 1] = item
             end
         end
