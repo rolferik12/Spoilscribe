@@ -11,6 +11,15 @@ SpoilscribeDB = SpoilscribeDB or {}
 SpoilscribeCharDB = SpoilscribeCharDB or {}
 SpoilscribeCharDB.favorites = SpoilscribeCharDB.favorites or {}
 
+-- Addon communication for sharing favorite dungeons with party.
+local COMM_PREFIX = "Spoilscribe"
+if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
+    C_ChatInfo.RegisterAddonMessagePrefix(COMM_PREFIX)
+end
+
+-- Party members' favorite dungeon names: { ["PlayerName-Realm"] = { ["DungeonName"] = true, ... } }
+local _partyFavDungeons = {}
+
 -- Build the player's specialization list at runtime.
 -- Returns an array: { {label="All Specs", classID=0, specID=0}, {label="Frost", classID=6, specID=251}, ... }
 local _specList = nil
@@ -689,16 +698,123 @@ function Spoilscribe:Open()
     self.UI:ToggleMainFrame()
 end
 
+-- Returns a set of dungeon names for which the player has at least one favorite.
+function Spoilscribe:GetFavoriteDungeonNames()
+    SpoilscribeCharDB.favorites = SpoilscribeCharDB.favorites or {}
+    local favIDs = SpoilscribeCharDB.favorites
+    if not next(favIDs) then return {} end
+
+    local result = {}
+    -- Check all cache keys so we don't depend on current UI selection.
+    for _, dungeons in pairs(_lootCache) do
+        for _, dungeonEntry in ipairs(dungeons) do
+            if not result[dungeonEntry.dungeonName] then
+                for _, item in ipairs(dungeonEntry.items) do
+                    if item.itemID and favIDs[item.itemID] then
+                        result[dungeonEntry.dungeonName] = true
+                        break
+                    end
+                end
+            end
+        end
+    end
+    return result
+end
+
+local function IsPlayerInInstance()
+    if _G.IsInInstance then
+        local _, instanceType = _G.IsInInstance()
+        return instanceType and instanceType ~= "none"
+    end
+    return false
+end
+
+function Spoilscribe:BroadcastFavorites()
+    if IsPlayerInInstance() then return end
+    if not IsInGroup or not IsInGroup() then return end
+
+    local dungeons = self:GetFavoriteDungeonNames()
+    local names = {}
+    for dn in pairs(dungeons) do
+        names[#names + 1] = dn
+    end
+    -- Send comma-separated dungeon names (empty string = no favorites).
+    local payload = table.concat(names, ",")
+    local channel = IsInGroup(LE_PARTY_CATEGORY_INSTANCE) and "INSTANCE_CHAT" or "PARTY"
+    C_ChatInfo.SendAddonMessage(COMM_PREFIX, payload, channel)
+end
+
+function Spoilscribe:GetPartyFavDungeons()
+    return _partyFavDungeons
+end
+
+local function OnCommReceived(prefix, message, _, sender)
+    if prefix ~= COMM_PREFIX then return end
+    -- Ignore messages from self.
+    local myName = UnitName("player")
+    local myRealm = GetNormalizedRealmName and GetNormalizedRealmName() or GetRealmName():gsub("%s", "")
+    local myFullName = myName .. "-" .. myRealm
+    if sender == myName or sender == myFullName then return end
+
+    local dungeons = {}
+    if message and message ~= "" then
+        for dn in message:gmatch("[^,]+") do
+            local trimmed = dn:match("^%s*(.-)%s*$")
+            if trimmed and trimmed ~= "" then
+                dungeons[trimmed] = true
+            end
+        end
+    end
+    _partyFavDungeons[sender] = next(dungeons) and dungeons or nil
+
+    -- Refresh the UI if open so icons update.
+    if Spoilscribe.UI and Spoilscribe.UI.frame and Spoilscribe.UI.frame:IsShown() then
+        Spoilscribe.UI:RenderPage()
+    end
+end
+
 local f = CreateFrame("Frame")
 f:RegisterEvent("ADDON_LOADED")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
-f:SetScript("OnEvent", function(_, event, arg1)
+f:RegisterEvent("CHAT_MSG_ADDON")
+f:RegisterEvent("GROUP_ROSTER_UPDATE")
+f:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
+    if event == "CHAT_MSG_ADDON" then
+        OnCommReceived(arg1, arg2, arg3, arg4)
+        return
+    end
+
+    if event == "GROUP_ROSTER_UPDATE" then
+        -- Prune members who left the group.
+        if IsInGroup and IsInGroup() then
+            local validNames = {}
+            for i = 1, GetNumGroupMembers() do
+                local name = GetRaidRosterInfo(i)
+                if name then validNames[name] = true end
+            end
+            for sender in pairs(_partyFavDungeons) do
+                -- sender may be "Name" or "Name-Realm"
+                local shortName = sender:match("^([^-]+)") or sender
+                if not validNames[sender] and not validNames[shortName] then
+                    _partyFavDungeons[sender] = nil
+                end
+            end
+        else
+            wipe(_partyFavDungeons)
+        end
+        -- Broadcast our own favorites to new/changed party.
+        Spoilscribe:BroadcastFavorites()
+        return
+    end
+
     if event == "PLAYER_ENTERING_WORLD" then
         -- Scan all difficulty+spec combos up front so the EJ is never needed again.
         local ok, err = pcall(ScanAllCombinations)
         if not ok then
             LogToConsole("Initial loot scan failed: " .. tostring(err))
         end
+        -- Broadcast favorites now that data is ready.
+        Spoilscribe:BroadcastFavorites()
         f:UnregisterEvent("PLAYER_ENTERING_WORLD")
         return
     end

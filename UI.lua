@@ -865,8 +865,19 @@ function UI:RenderPage()
                     if frame.slideOut and frame.slideOut:IsShown() then
                         Spoilscribe.UI:RenderFavorites()
                     end
+                    Spoilscribe:BroadcastFavorites()
                 end)
                 row.favBtn:Hide()
+
+                -- Party friend icons (up to 4 for party members with favorites in this dungeon).
+                row.partyIcons = {}
+                for pi = 1, 4 do
+                    local pIcon = row:CreateTexture(nil, "OVERLAY")
+                    pIcon:SetAtlas("housefinder_neighborhood-list-friend-icon")
+                    pIcon:SetSize(16, 16)
+                    pIcon:Hide()
+                    row.partyIcons[pi] = pIcon
+                end
 
                 frame.rows[rowIndex] = row
             end
@@ -884,6 +895,9 @@ function UI:RenderPage()
             if row.headerBg then row.headerBg:Hide() end
             if row.headerText then row.headerText:SetText(""); row.headerText:Hide() end
             if row.favBtn then row.favBtn:Hide() end
+            if row.partyIcons then
+                for _, pIcon in ipairs(row.partyIcons) do pIcon:Hide() end
+            end
 
             local text = ""
             local showIcon = false
@@ -994,6 +1008,23 @@ function UI:RenderPage()
                     row.headerText:SetText(text:gsub("[%[%]]", ""))
                     row.headerText:SetTextColor(75/255, 50/255, 20/255)
                     row.headerText:Show()
+                end
+                -- Show party friend icons for members with favorites in this dungeon.
+                if row.partyIcons then
+                    local partyData = Spoilscribe:GetPartyFavDungeons()
+                    local dungeonName = line.text or ""
+                    local iconIdx = 0
+                    for sender, dungeons in pairs(partyData) do
+                        if dungeons[dungeonName] then
+                            iconIdx = iconIdx + 1
+                            if iconIdx <= #row.partyIcons then
+                                local pIcon = row.partyIcons[iconIdx]
+                                pIcon:ClearAllPoints()
+                                pIcon:SetPoint("RIGHT", row, "RIGHT", -4 - (iconIdx - 1) * 18, 0)
+                                pIcon:Show()
+                            end
+                        end
+                    end
                 end
                 row.text:SetText("")
             else
@@ -1169,6 +1200,7 @@ function UI:RenderFavorites()
                 Spoilscribe.UI:RenderFavorites()
                 slideOut:UpdateBackground()
                 Spoilscribe.UI:RenderPage()
+                Spoilscribe:BroadcastFavorites()
                 return
             end
             local pinnedItem = self._pinnedData
