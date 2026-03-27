@@ -647,6 +647,11 @@ function Spoilscribe:RefreshLoot()
         return
     end
 
+    -- Clear any pinned favorite item so normal filtering resumes.
+    if self.UI.frame then
+        self.UI.frame._pinnedItem = nil
+    end
+
     local ok, lines = pcall(function()
         return self:BuildLootLines()
     end)

@@ -1007,12 +1007,15 @@ function UI:RenderFavorites()
                     GameTooltip:Hide()
                 end)
                 row:SetScript("OnClick", function(self)
-                    local searchName = self._itemName
-                    if searchName and searchName ~= "" and frame.searchBox then
-                        SpoilscribeDB.searchFields = SpoilscribeDB.searchFields or {}
-                        SpoilscribeDB.searchFields.itemName = true
-                        frame.searchBox:SetText(searchName)
-                        frame.searchBox:SetCursorPosition(0)
+                    if not self.itemID then return end
+                    local pinnedItem = self._pinnedData
+                    if pinnedItem then
+                        frame._pinnedItem = pinnedItem
+                        local lines = {
+                            { type = "header", text = pinnedItem.dungeonName or "" },
+                            pinnedItem,
+                        }
+                        Spoilscribe.UI:RenderLoot(lines)
                     end
                 end)
 
@@ -1027,6 +1030,7 @@ function UI:RenderFavorites()
 
             row.itemID = item.itemID
             row._itemName = item.itemName or ""
+            row._pinnedData = item
             row.itemLink = item.itemLink
 
             local name = Spoilscribe:GetQualityColoredItemText({
