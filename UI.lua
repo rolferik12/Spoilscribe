@@ -169,6 +169,7 @@ function UI:CreateMainFrame()
         end
     end
     frame.selectedSpecIndex = defaultSpecIndex
+    frame._defaultSpecIndex = defaultSpecIndex
     frame.specDropdown = BuildDropdown(
         controls,
         dropdownWidth,
@@ -410,6 +411,56 @@ function UI:CreateMainFrame()
         end
     end)
 
+    -- Clear-filter button (visible only when a pinned/zoom view is active).
+    local clearFilterBtn = CreateFrame("Button", nil, resultArea)
+    clearFilterBtn:SetSize(21, 21)
+    clearFilterBtn:SetPoint("TOPRIGHT", resultArea, "TOPRIGHT", -15, -11)
+    clearFilterBtn:SetNormalAtlas("perks-dropdown-clear")
+    clearFilterBtn:SetHighlightAtlas("perks-dropdown-clear")
+    clearFilterBtn:GetHighlightTexture():SetAlpha(0.6)
+    clearFilterBtn:SetFrameLevel(resultArea:GetFrameLevel() + 10)
+    clearFilterBtn:Hide()
+    clearFilterBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:SetText("Clear Filter")
+        GameTooltip:Show()
+    end)
+    clearFilterBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    clearFilterBtn:SetScript("OnClick", function()
+        frame._hasFilter = false
+        -- Reset dropdowns to defaults.
+        frame.selectedDifficultyIndex = 1
+        frame.difficultyDropdown.selectedIndex = 1
+        UIDropDownMenu_SetSelectedID(frame.difficultyDropdown, 1)
+        UIDropDownMenu_SetText(frame.difficultyDropdown, Spoilscribe.Data.Difficulties[1].label)
+
+        frame.selectedSlotIndex = 1
+        frame.slotDropdown.selectedIndex = 1
+        UIDropDownMenu_SetSelectedID(frame.slotDropdown, 1)
+        UIDropDownMenu_SetText(frame.slotDropdown, Spoilscribe.Data.Filters.slots[1])
+
+        frame.selectedSecondaryIndex = 1
+        frame.secondaryDropdown.selectedIndex = 1
+        UIDropDownMenu_SetSelectedID(frame.secondaryDropdown, 1)
+        UIDropDownMenu_SetText(frame.secondaryDropdown, Spoilscribe.Data.Filters.secondaryStats[1])
+
+        local specList = Spoilscribe:GetSpecList()
+        local defSpec = frame._defaultSpecIndex
+        frame.selectedSpecIndex = defSpec
+        frame.specDropdown.selectedIndex = defSpec
+        UIDropDownMenu_SetSelectedID(frame.specDropdown, defSpec)
+        local specItem = specList[defSpec]
+        UIDropDownMenu_SetText(frame.specDropdown, specItem and (specItem.label or specItem.name) or "")
+
+        -- Clear search text.
+        frame.searchBox:SetText("")
+        frame.searchBox:ClearFocus()
+        Spoilscribe:RefreshLoot()
+    end)
+    frame.clearFilterBtn = clearFilterBtn
+
     frame.resultArea = resultArea
     frame.content = content
     frame.rows = {}
@@ -516,6 +567,32 @@ function UI:CreateMainFrame()
     zoomBtn:SetScript("OnLeave", function()
         GameTooltip:Hide()
     end)
+    zoomBtn:SetScript("OnClick", function()
+        local items = Spoilscribe:GetFavoriteItems()
+        if #items == 0 then return end
+
+        -- Group by dungeon name.
+        local dungeonOrder = {}
+        local dungeonGroups = {}
+        for _, item in ipairs(items) do
+            local dn = item.dungeonName or "Unknown"
+            if not dungeonGroups[dn] then
+                dungeonGroups[dn] = {}
+                dungeonOrder[#dungeonOrder + 1] = dn
+            end
+            dungeonGroups[dn][#dungeonGroups[dn] + 1] = item
+        end
+
+        local lines = {}
+        for _, dn in ipairs(dungeonOrder) do
+            lines[#lines + 1] = { type = "header", text = dn }
+            for _, item in ipairs(dungeonGroups[dn]) do
+                lines[#lines + 1] = item
+            end
+        end
+        frame._hasFilter = true
+        Spoilscribe.UI:RenderLoot(lines)
+    end)
     frame.zoomBtn = zoomBtn
 
     self.frame = frame
@@ -558,10 +635,29 @@ function UI:ToggleMainFrame()
     end
 end
 
+function UI:HasActiveFilter()
+    local frame = self.frame
+    if not frame then return false end
+    if frame._hasFilter then return true end
+    if (frame.selectedDifficultyIndex or 1) ~= 1 then return true end
+    if (frame.selectedSlotIndex or 1) ~= 1 then return true end
+    if (frame.selectedSecondaryIndex or 1) ~= 1 then return true end
+    if (frame.selectedSpecIndex or 1) ~= (frame._defaultSpecIndex or 1) then return true end
+    if frame.searchText and frame.searchText ~= "" then return true end
+    return false
+end
+
 function UI:RenderLoot(lines)
     local frame = self.frame or self:CreateMainFrame()
     frame._lines = lines
     frame.currentPage = 1
+    if frame.clearFilterBtn then
+        if self:HasActiveFilter() then
+            frame.clearFilterBtn:Show()
+        else
+            frame.clearFilterBtn:Hide()
+        end
+    end
     self:RenderPage()
 end
 
@@ -1078,6 +1174,7 @@ function UI:RenderFavorites()
             local pinnedItem = self._pinnedData
             if pinnedItem then
                 frame._pinnedItem = pinnedItem
+                frame._hasFilter = true
                 local lines = {
                     { type = "header", text = pinnedItem.dungeonName or "" },
                     pinnedItem,
