@@ -81,6 +81,9 @@ function UI:CreateMainFrame()
 
     tinsert(UISpecialFrames, "SpoilscribeFrame")
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+    frame:SetScript("OnHide", function()
+        PlaySound(SOUNDKIT.IG_QUEST_LOG_CLOSE)
+    end)
     frame:Hide()
 
     frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -606,7 +609,6 @@ function UI:ToggleMainFrame()
     end
     if frame:IsShown() then
         frame:Hide()
-        PlaySound(SOUNDKIT.IG_QUEST_LOG_CLOSE)
     else
         -- Close the Encounter Journal if it's open.
         if EncounterJournal and EncounterJournal:IsShown() then
