@@ -334,8 +334,20 @@ function UI:CreateMainFrame()
     end)
 
     -- Close popup when clicking elsewhere.
+    local settingsOverlay = CreateFrame("Button", nil, UIParent)
+    settingsOverlay:SetAllPoints(UIParent)
+    settingsOverlay:SetFrameStrata("DIALOG")
+    settingsOverlay:SetFrameLevel(settingsPopup:GetFrameLevel() - 1)
+    settingsOverlay:Hide()
+    settingsOverlay:SetScript("OnClick", function()
+        settingsPopup:Hide()
+    end)
+
     settingsPopup:SetScript("OnShow", function()
-        settingsPopup:SetPropagateKeyboardInput(true)
+        settingsOverlay:Show()
+    end)
+    settingsPopup:SetScript("OnHide", function()
+        settingsOverlay:Hide()
     end)
     settingsPopup:EnableMouse(true)
 
@@ -457,17 +469,23 @@ function UI:CreateMainFrame()
     slideBtn:SetScript("OnLeave", function()
         GameTooltip:Hide()
     end)
-    slideBtn:SetScript("OnClick", function()
-        if slideOut:IsShown() then
-            slideOut:Hide()
-            slideBtn:ClearAllPoints()
-            slideBtn:SetPoint("RIGHT", frame, "RIGHT", 41, 93)
-        else
+    local function SetFavoritesOpen(open)
+        if open then
             slideOut:Show()
             Spoilscribe.UI:RenderFavorites()
             slideBtn:ClearAllPoints()
             slideBtn:SetPoint("RIGHT", slideOut, "RIGHT", 41, 93)
+        else
+            slideOut:Hide()
+            slideBtn:ClearAllPoints()
+            slideBtn:SetPoint("RIGHT", frame, "RIGHT", 41, 93)
         end
+        SpoilscribeCharDB.favoritesOpen = open and true or false
+    end
+    frame.SetFavoritesOpen = SetFavoritesOpen
+
+    slideBtn:SetScript("OnClick", function()
+        SetFavoritesOpen(not slideOut:IsShown())
     end)
     frame.slideBtn = slideBtn
 
@@ -504,6 +522,9 @@ function UI:ToggleMainFrame()
         end
 
         frame:Show()
+        if SpoilscribeCharDB.favoritesOpen and frame.SetFavoritesOpen then
+            frame.SetFavoritesOpen(true)
+        end
         Spoilscribe:RefreshLoot()
     end
 end
