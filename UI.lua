@@ -461,9 +461,14 @@ function UI:CreateMainFrame()
     slideBtn:SetHighlightAtlas("HordeFrame_Title-end")
     slideBtn:GetHighlightTexture():SetAlpha(0.4)
     slideBtn:SetFrameLevel(frame:GetFrameLevel() + 2)
+
+    local slideBtnIcon = slideBtn:CreateTexture(nil, "OVERLAY")
+    slideBtnIcon:SetAtlas("crosshair_directions_128")
+    slideBtnIcon:SetSize(20, 20)
+    slideBtnIcon:SetPoint("CENTER", slideBtn, "CENTER", -8, 3)
     slideBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("View Favorites")
+        GameTooltip:SetText(slideOut:IsShown() and "Close Favorites" or "View Favorites")
         GameTooltip:Show()
     end)
     slideBtn:SetScript("OnLeave", function()
@@ -488,6 +493,30 @@ function UI:CreateMainFrame()
         SetFavoritesOpen(not slideOut:IsShown())
     end)
     frame.slideBtn = slideBtn
+
+    -- Zoom Favorites button beneath the View Favorites button.
+    local zoomBtn = CreateFrame("Button", nil, frame)
+    zoomBtn:SetSize(48, 40)
+    zoomBtn:SetPoint("TOP", slideBtn, "BOTTOM", 0, 0)
+    zoomBtn:SetNormalAtlas("HordeFrame_Title-end")
+    zoomBtn:SetHighlightAtlas("HordeFrame_Title-end")
+    zoomBtn:GetHighlightTexture():SetAlpha(0.4)
+    zoomBtn:SetFrameLevel(frame:GetFrameLevel() + 2)
+
+    local zoomBtnIcon = zoomBtn:CreateTexture(nil, "OVERLAY")
+    zoomBtnIcon:SetAtlas("Crosshair_pickup_48")
+    zoomBtnIcon:SetSize(20, 20)
+    zoomBtnIcon:SetPoint("CENTER", zoomBtn, "CENTER", -8, 3)
+
+    zoomBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Zoom Favorites")
+        GameTooltip:Show()
+    end)
+    zoomBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    frame.zoomBtn = zoomBtn
 
     self.frame = frame
     return frame
