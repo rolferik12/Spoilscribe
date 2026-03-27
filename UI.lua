@@ -1036,8 +1036,16 @@ function UI:RenderFavorites()
         row:SetScript("OnLeave", function()
             GameTooltip:Hide()
         end)
-        row:SetScript("OnClick", function(self)
+        row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        row:SetScript("OnClick", function(self, button)
             if not self.itemID then return end
+            if button == "RightButton" then
+                SpoilscribeCharDB.favorites[self.itemID] = nil
+                Spoilscribe.UI:RenderFavorites()
+                slideOut:UpdateBackground()
+                Spoilscribe.UI:RenderPage()
+                return
+            end
             local pinnedItem = self._pinnedData
             if pinnedItem then
                 frame._pinnedItem = pinnedItem
