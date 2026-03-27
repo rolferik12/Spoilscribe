@@ -141,7 +141,7 @@ local function GetLootInfoByIndex(index, encounterID)
     }
 end
 
-local function GetQualityColoredItemText(loot)
+function Spoilscribe:GetQualityColoredItemText(loot)
     if loot.link and loot.link ~= "" then
         return loot.link
     end
@@ -166,6 +166,10 @@ local function GetQualityColoredItemText(loot)
     end
 
     return name
+end
+
+local GetQualityColoredItemText = function(loot)
+    return Spoilscribe:GetQualityColoredItemText(loot)
 end
 
 local function NormalizeSlotText(value)
@@ -591,6 +595,51 @@ function Spoilscribe:InvalidateLootCache()
     wipe(_lootCache)
 end
 
+function Spoilscribe:GetFavoriteItems()
+    SpoilscribeDB.favorites = SpoilscribeDB.favorites or {}
+    local favIDs = SpoilscribeDB.favorites
+    if not next(favIDs) then return {} end
+
+    -- Use the currently selected difficulty + spec so links/quality match what the user sees.
+    local frame = self.UI and self.UI.frame
+    local diffId = 23
+    local specId = 0
+    if frame then
+        local difficulty = self.Data.Difficulties[frame.selectedDifficultyIndex or 1]
+        diffId = difficulty and difficulty.id or 23
+        local specs = self:GetSpecList()
+        local selectedSpec = specs[frame.selectedSpecIndex or 1] or specs[1]
+        specId = selectedSpec.specID or 0
+    end
+
+    local key = CacheKey(diffId, specId)
+    local dungeons = _lootCache[key]
+    if not dungeons then return {} end
+
+    local seen = {}
+    local results = {}
+    for _, dungeonEntry in ipairs(dungeons) do
+        for _, item in ipairs(dungeonEntry.items) do
+            if item.itemID and favIDs[item.itemID] and not seen[item.itemID] then
+                seen[item.itemID] = true
+                results[#results + 1] = {
+                    type        = "item",
+                    itemID      = item.itemID,
+                    itemLink    = item.itemLink,
+                    itemName    = item.itemName,
+                    itemQuality = item.itemQuality,
+                    icon        = item.icon,
+                    slot        = item.slot or "",
+                    armorType   = item.armorType or "",
+                    bossName    = item.bossName,
+                    dungeonName = dungeonEntry.dungeonName,
+                }
+            end
+        end
+    end
+    return results
+end
+
 function Spoilscribe:RefreshLoot()
     _hadMissingLinks = false
 
@@ -616,6 +665,11 @@ function Spoilscribe:RefreshLoot()
     end
 
     self.UI:RenderLoot(lines)
+
+    -- Refresh the favorites panel if it's open, since difficulty/spec may have changed.
+    if self.UI.frame and self.UI.frame.slideOut and self.UI.frame.slideOut:IsShown() then
+        self.UI:RenderFavorites()
+    end
 end
 
 function Spoilscribe:Open()

@@ -410,6 +410,16 @@ function UI:CreateMainFrame()
     slideTitle:SetPoint("TOPLEFT", slideOut, "TOPLEFT", 14, -14)
     slideTitle:SetText("Favorites")
 
+    -- Scrollable content inside the favorites box.
+    local favScroll = CreateFrame("ScrollFrame", "SpoilscribeFavScroll", slideOut, "UIPanelScrollFrameTemplate")
+    favScroll:SetPoint("TOPLEFT", slideOut, "TOPLEFT", 8, -36)
+    favScroll:SetPoint("BOTTOMRIGHT", slideOut, "BOTTOMRIGHT", -28, 8)
+    local favContent = CreateFrame("Frame", nil, favScroll)
+    favContent:SetSize(210, 1)
+    favScroll:SetScrollChild(favContent)
+    slideOut._favContent = favContent
+    slideOut._favRows = {}
+
     -- Toggle button on the right edge of the main frame.
     local slideBtn = CreateFrame("Button", nil, frame)
     slideBtn:SetSize(48, 40)
@@ -418,6 +428,14 @@ function UI:CreateMainFrame()
     slideBtn:SetHighlightAtlas("HordeFrame_Title-end")
     slideBtn:GetHighlightTexture():SetAlpha(0.4)
     slideBtn:SetFrameLevel(frame:GetFrameLevel() + 2)
+    slideBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("View Favorites")
+        GameTooltip:Show()
+    end)
+    slideBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
     slideBtn:SetScript("OnClick", function()
         if slideOut:IsShown() then
             slideOut:Hide()
@@ -425,6 +443,7 @@ function UI:CreateMainFrame()
             slideBtn:SetPoint("RIGHT", frame, "RIGHT", 41, 93)
         else
             slideOut:Show()
+            Spoilscribe.UI:RenderFavorites()
             slideBtn:ClearAllPoints()
             slideBtn:SetPoint("RIGHT", slideOut, "RIGHT", 41, 93)
         end
@@ -672,6 +691,9 @@ function UI:RenderPage()
                     if frame.slideOut and frame.slideOut.UpdateBackground then
                         frame.slideOut:UpdateBackground()
                     end
+                    if frame.slideOut and frame.slideOut:IsShown() then
+                        Spoilscribe.UI:RenderFavorites()
+                    end
                 end)
                 row.favBtn:Hide()
 
@@ -725,6 +747,10 @@ function UI:RenderPage()
                     local g = tonumber(hexColor:sub(5, 6), 16) / 255
                     local b = tonumber(hexColor:sub(7, 8), 16) / 255
                     row.IconBorder:SetVertexColor(r, g, b)
+                    row.IconBorder:Show()
+                elseif hexColor and type(hexColor) == "number" and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[hexColor] then
+                    local c = ITEM_QUALITY_COLORS[hexColor]
+                    row.IconBorder:SetVertexColor(c.r, c.g, c.b)
                     row.IconBorder:Show()
                 else
                     row.IconBorder:Hide()
@@ -836,4 +862,131 @@ function UI:RenderPage()
     frame.pageText:SetText("Page " .. frame.currentPage .. " / " .. frame.totalPages)
     frame.prevButton:SetEnabled(frame.currentPage > 1)
     frame.nextButton:SetEnabled(frame.currentPage < frame.totalPages)
+end
+
+function UI:RenderFavorites()
+    local frame = self.frame
+    if not frame or not frame.slideOut then return end
+
+    local slideOut = frame.slideOut
+    local content = slideOut._favContent
+    local rows = slideOut._favRows
+
+    -- Hide existing rows.
+    for _, row in ipairs(rows) do
+        row:Hide()
+    end
+
+    local items = Spoilscribe:GetFavoriteItems()
+
+    if #items == 0 then
+        content:SetHeight(1)
+        return
+    end
+
+    local ICON_SIZE = 32
+    local ROW_HEIGHT = 36
+    local y = 0
+
+    for i, item in ipairs(items) do
+        local row = rows[i]
+        if not row then
+            row = CreateFrame("Button", nil, content, "BackdropTemplate")
+            row:SetSize(210, ROW_HEIGHT)
+
+            row.bg = row:CreateTexture(nil, "BACKGROUND")
+            row.bg:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+            row.bg:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
+            row.bg:SetHeight(ROW_HEIGHT)
+            row.bg:SetAtlas("Adventures_MissionList")
+
+            row.highlight = row:CreateTexture(nil, "HIGHLIGHT")
+            row.highlight:SetAllPoints(row.bg)
+            row.highlight:SetAtlas("Adventures_MissionList_Highlight")
+
+            row.icon = row:CreateTexture(nil, "ARTWORK")
+            row.icon:SetSize(ICON_SIZE, ICON_SIZE)
+            row.icon:SetPoint("TOPLEFT", row, "TOPLEFT", 2, -2)
+
+            row.IconBorder = row:CreateTexture(nil, "OVERLAY")
+            row.IconBorder:SetTexture("Interface/Common/WhiteIconFrame")
+            row.IconBorder:SetSize(ICON_SIZE, ICON_SIZE)
+            row.IconBorder:SetAllPoints(row.icon)
+            row.IconBorder:Hide()
+
+            row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
+            row.text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+            row.text:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+            row.text:SetJustifyH("LEFT")
+            row.text:SetJustifyV("MIDDLE")
+
+            row:SetScript("OnEnter", function(self)
+                if not (self.itemLink or self.itemID) then return end
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                if self.itemLink and self.itemLink ~= "" then
+                    GameTooltip:SetHyperlink(self.itemLink)
+                elseif self.itemID then
+                    GameTooltip:SetItemByID(self.itemID)
+                end
+                GameTooltip:Show()
+            end)
+            row:SetScript("OnLeave", function()
+                GameTooltip:Hide()
+            end)
+            row:SetScript("OnClick", function(self)
+                local searchName = self._itemName
+                if searchName and searchName ~= "" and frame.searchBox then
+                    SpoilscribeDB.searchFields = SpoilscribeDB.searchFields or {}
+                    SpoilscribeDB.searchFields.itemName = true
+                    frame.searchBox:SetText(searchName)
+                    frame.searchBox:SetCursorPosition(0)
+                end
+            end)
+
+            rows[i] = row
+        end
+
+        row.itemID = item.itemID
+        row._itemName = item.itemName or ""
+        row.itemLink = item.itemLink
+
+        local name = Spoilscribe:GetQualityColoredItemText({
+            link    = item.itemLink,
+            name    = item.itemName,
+            itemID  = item.itemID,
+        })
+        row.text:SetText(name:gsub("[%[%]]", ""))
+
+        if item.icon then
+            row.icon:SetTexture(item.icon)
+            row.icon:Show()
+            row.bg:Show()
+            local hexColor = type(item) == "table" and item.itemQuality
+            if hexColor and type(hexColor) == "string" and #hexColor == 8 then
+                local r = tonumber(hexColor:sub(3, 4), 16) / 255
+                local g = tonumber(hexColor:sub(5, 6), 16) / 255
+                local b = tonumber(hexColor:sub(7, 8), 16) / 255
+                row.IconBorder:SetVertexColor(r, g, b)
+                row.IconBorder:Show()
+            elseif hexColor and type(hexColor) == "number" and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[hexColor] then
+                local c = ITEM_QUALITY_COLORS[hexColor]
+                row.IconBorder:SetVertexColor(c.r, c.g, c.b)
+                row.IconBorder:Show()
+            else
+                row.IconBorder:Hide()
+            end
+        else
+            row.icon:Hide()
+            row.IconBorder:Hide()
+            row.bg:Hide()
+        end
+
+        row:EnableMouse(true)
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, y)
+        row:Show()
+        y = y - ROW_HEIGHT - 2
+    end
+
+    content:SetHeight(math.max(1, #items * (ROW_HEIGHT + 2)))
 end
