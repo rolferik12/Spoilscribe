@@ -377,6 +377,60 @@ function UI:CreateMainFrame()
     frame.content = content
     frame.rows = {}
 
+    -- Favorites box (slide-out panel, hidden by default, opens to the right).
+    local slideOut = CreateFrame("Frame", "SpoilscribeSlideOut", frame, "BackdropTemplate")
+    slideOut:SetSize(250, 579)
+    slideOut:SetPoint("TOPLEFT", frame, "TOPRIGHT", 0, 0)
+    slideOut:SetBackdrop({
+        edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+        edgeSize = 12,
+        insets   = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    slideOut:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+    slideOut:SetFrameLevel(frame:GetFrameLevel() + 1)
+    slideOut:Hide()
+    frame.slideOut = slideOut
+
+    local slideOutBg = slideOut:CreateTexture(nil, "BACKGROUND")
+    slideOutBg:SetAllPoints(slideOut)
+    slideOut._bg = slideOutBg
+
+    function slideOut:UpdateBackground()
+        SpoilscribeDB.favorites = SpoilscribeDB.favorites or {}
+        local hasFavorites = next(SpoilscribeDB.favorites) ~= nil
+        if hasFavorites then
+            self._bg:SetAtlas("QuestLog-main-background")
+        else
+            self._bg:SetAtlas("QuestLog-empty-quest-background")
+        end
+    end
+    slideOut:UpdateBackground()
+
+    local slideTitle = slideOut:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    slideTitle:SetPoint("TOPLEFT", slideOut, "TOPLEFT", 14, -14)
+    slideTitle:SetText("Favorites")
+
+    -- Toggle button on the right edge of the main frame.
+    local slideBtn = CreateFrame("Button", nil, frame)
+    slideBtn:SetSize(48, 40)
+    slideBtn:SetPoint("RIGHT", frame, "RIGHT", 41, 93)
+    slideBtn:SetNormalAtlas("HordeFrame_Title-end")
+    slideBtn:SetHighlightAtlas("HordeFrame_Title-end")
+    slideBtn:GetHighlightTexture():SetAlpha(0.4)
+    slideBtn:SetFrameLevel(frame:GetFrameLevel() + 2)
+    slideBtn:SetScript("OnClick", function()
+        if slideOut:IsShown() then
+            slideOut:Hide()
+            slideBtn:ClearAllPoints()
+            slideBtn:SetPoint("RIGHT", frame, "RIGHT", 41, 93)
+        else
+            slideOut:Show()
+            slideBtn:ClearAllPoints()
+            slideBtn:SetPoint("RIGHT", slideOut, "RIGHT", 41, 93)
+        end
+    end)
+    frame.slideBtn = slideBtn
+
     self.frame = frame
     return frame
 end
@@ -589,19 +643,34 @@ function UI:RenderPage()
                 end)
 
                 row.favBtn = CreateFrame("Button", nil, row)
-                row.favBtn:SetSize(20, 18)
-                row.favBtn:SetPoint("TOPRIGHT", row, "TOPRIGHT", -2, -3)
-                row.favBtn:SetNormalAtlas("auctionhouse-icon-favorite-off")
+                row.favBtn:SetSize(22, 20)
+                row.favBtn:SetPoint("TOPRIGHT", row, "TOPRIGHT", 3, -3)
+                row.favBtn:SetNormalAtlas("PetJournal-FavoritesIcon")
+                row.favBtn:GetNormalTexture():SetDesaturated(true)
+                row.favBtn:GetNormalTexture():SetAlpha(0.3)
+                row.favBtn:SetScript("OnEnter", function(self)
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    GameTooltip:SetText("Favorite")
+                    GameTooltip:Show()
+                end)
+                row.favBtn:SetScript("OnLeave", function()
+                    GameTooltip:Hide()
+                end)
                 row.favBtn:SetScript("OnClick", function(self)
                     local id = self:GetParent().itemID
                     if not id then return end
                     SpoilscribeDB.favorites = SpoilscribeDB.favorites or {}
                     if SpoilscribeDB.favorites[id] then
                         SpoilscribeDB.favorites[id] = nil
-                        self:SetNormalAtlas("auctionhouse-icon-favorite-off")
+                        self:GetNormalTexture():SetDesaturated(true)
+                        self:GetNormalTexture():SetAlpha(0.3)
                     else
                         SpoilscribeDB.favorites[id] = true
-                        self:SetNormalAtlas("auctionhouse-icon-favorite")
+                        self:GetNormalTexture():SetDesaturated(false)
+                        self:GetNormalTexture():SetAlpha(1)
+                    end
+                    if frame.slideOut and frame.slideOut.UpdateBackground then
+                        frame.slideOut:UpdateBackground()
                     end
                 end)
                 row.favBtn:Hide()
@@ -743,9 +812,11 @@ function UI:RenderPage()
                 if row.itemID then
                     SpoilscribeDB.favorites = SpoilscribeDB.favorites or {}
                     if SpoilscribeDB.favorites[row.itemID] then
-                        row.favBtn:SetNormalAtlas("auctionhouse-icon-favorite")
+                        row.favBtn:GetNormalTexture():SetDesaturated(false)
+                        row.favBtn:GetNormalTexture():SetAlpha(1)
                     else
-                        row.favBtn:SetNormalAtlas("auctionhouse-icon-favorite-off")
+                        row.favBtn:GetNormalTexture():SetDesaturated(true)
+                        row.favBtn:GetNormalTexture():SetAlpha(0.3)
                     end
                     row.favBtn:Show()
                 else
