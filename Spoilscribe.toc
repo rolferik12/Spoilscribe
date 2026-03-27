@@ -8,5 +8,6 @@
 
 Bootstrap.lua
 Data.lua
+Options.lua
 UI.lua
 Core.lua

@@ -606,6 +606,7 @@ function UI:ToggleMainFrame()
     end
     if frame:IsShown() then
         frame:Hide()
+        PlaySound(SOUNDKIT.IG_QUEST_LOG_CLOSE)
     else
         -- Close the Encounter Journal if it's open.
         if EncounterJournal and EncounterJournal:IsShown() then
@@ -628,6 +629,7 @@ function UI:ToggleMainFrame()
         end
 
         frame:Show()
+        PlaySound(SOUNDKIT.IG_QUEST_LOG_OPEN)
         if SpoilscribeCharDB.favoritesOpen and frame.SetFavoritesOpen then
             frame.SetFavoritesOpen(true)
         end

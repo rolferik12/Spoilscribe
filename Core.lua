@@ -732,6 +732,7 @@ end
 function Spoilscribe:BroadcastFavorites()
     if IsPlayerInInstance() then return end
     if not IsInGroup or not IsInGroup() then return end
+    if self.GetOption and not self:GetOption("groupSync") then return end
 
     local dungeons = self:GetFavoriteDungeonNames()
     local names = {}
@@ -750,6 +751,7 @@ end
 
 local function OnCommReceived(prefix, message, _, sender)
     if prefix ~= COMM_PREFIX then return end
+    if Spoilscribe.GetOption and not Spoilscribe:GetOption("groupSync") then return end
     -- Ignore messages from self.
     local myName = UnitName("player")
     local myRealm = GetNormalizedRealmName and GetNormalizedRealmName() or GetRealmName():gsub("%s", "")
