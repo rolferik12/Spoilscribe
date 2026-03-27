@@ -237,10 +237,35 @@ function UI:CreateMainFrame()
     end)
     frame.searchBox = searchBox
 
-    -- Gear (settings) button.
-    local gearBtn = CreateFrame("Button", nil, searchContainer)
+    -- Clear button inside search bar (hidden when search is empty).
+    local clearBtn = CreateFrame("Button", nil, searchContainer)
+    clearBtn:SetSize(14, 14)
+    clearBtn:SetPoint("RIGHT", searchContainer, "RIGHT", -5, 0)
+    clearBtn:SetNormalAtlas("common-search-clearbutton")
+    clearBtn:GetNormalTexture():SetVertexColor(0.6, 0.6, 0.6)
+    clearBtn:SetHighlightAtlas("common-search-clearbutton")
+    clearBtn:GetHighlightTexture():SetVertexColor(1, 1, 1)
+    clearBtn:GetHighlightTexture():SetAlpha(1)
+    clearBtn:Hide()
+    clearBtn:SetScript("OnClick", function()
+        searchBox:SetText("")
+        searchBox:ClearFocus()
+    end)
+    frame.searchClearBtn = clearBtn
+
+    -- Show/hide clear button based on search text.
+    searchBox:HookScript("OnTextChanged", function(self)
+        if self:GetText() ~= "" then
+            clearBtn:Show()
+        else
+            clearBtn:Hide()
+        end
+    end)
+
+    -- Gear (settings) button, placed to the right of the search bar.
+    local gearBtn = CreateFrame("Button", nil, controls)
     gearBtn:SetSize(16, 16)
-    gearBtn:SetPoint("RIGHT", searchContainer, "RIGHT", -5, 0)
+    gearBtn:SetPoint("LEFT", searchContainer, "RIGHT", 6, 0)
     gearBtn:SetNormalTexture("Interface/WorldMap/GEAR_64GREY")
     gearBtn:SetHighlightTexture("Interface/WorldMap/GEAR_64GREY")
     gearBtn:GetHighlightTexture():SetAlpha(0.4)
@@ -406,13 +431,9 @@ function UI:CreateMainFrame()
     end
     slideOut:UpdateBackground()
 
-    local slideTitle = slideOut:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    slideTitle:SetPoint("TOPLEFT", slideOut, "TOPLEFT", 14, -14)
-    slideTitle:SetText("Favorites")
-
     -- Scrollable content inside the favorites box.
     local favScroll = CreateFrame("ScrollFrame", "SpoilscribeFavScroll", slideOut, "UIPanelScrollFrameTemplate")
-    favScroll:SetPoint("TOPLEFT", slideOut, "TOPLEFT", 8, -36)
+    favScroll:SetPoint("TOPLEFT", slideOut, "TOPLEFT", 8, -8)
     favScroll:SetPoint("BOTTOMRIGHT", slideOut, "BOTTOMRIGHT", -28, 8)
     local favContent = CreateFrame("Frame", nil, favScroll)
     favContent:SetSize(210, 1)
@@ -884,109 +905,165 @@ function UI:RenderFavorites()
         return
     end
 
-    local ICON_SIZE = 32
-    local ROW_HEIGHT = 36
-    local y = 0
-
-    for i, item in ipairs(items) do
-        local row = rows[i]
-        if not row then
-            row = CreateFrame("Button", nil, content, "BackdropTemplate")
-            row:SetSize(210, ROW_HEIGHT)
-
-            row.bg = row:CreateTexture(nil, "BACKGROUND")
-            row.bg:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
-            row.bg:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
-            row.bg:SetHeight(ROW_HEIGHT)
-            row.bg:SetAtlas("Adventures_MissionList")
-
-            row.highlight = row:CreateTexture(nil, "HIGHLIGHT")
-            row.highlight:SetAllPoints(row.bg)
-            row.highlight:SetAtlas("Adventures_MissionList_Highlight")
-
-            row.icon = row:CreateTexture(nil, "ARTWORK")
-            row.icon:SetSize(ICON_SIZE, ICON_SIZE)
-            row.icon:SetPoint("TOPLEFT", row, "TOPLEFT", 2, -2)
-
-            row.IconBorder = row:CreateTexture(nil, "OVERLAY")
-            row.IconBorder:SetTexture("Interface/Common/WhiteIconFrame")
-            row.IconBorder:SetSize(ICON_SIZE, ICON_SIZE)
-            row.IconBorder:SetAllPoints(row.icon)
-            row.IconBorder:Hide()
-
-            row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
-            row.text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
-            row.text:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-            row.text:SetJustifyH("LEFT")
-            row.text:SetJustifyV("MIDDLE")
-
-            row:SetScript("OnEnter", function(self)
-                if not (self.itemLink or self.itemID) then return end
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                if self.itemLink and self.itemLink ~= "" then
-                    GameTooltip:SetHyperlink(self.itemLink)
-                elseif self.itemID then
-                    GameTooltip:SetItemByID(self.itemID)
-                end
-                GameTooltip:Show()
-            end)
-            row:SetScript("OnLeave", function()
-                GameTooltip:Hide()
-            end)
-            row:SetScript("OnClick", function(self)
-                local searchName = self._itemName
-                if searchName and searchName ~= "" and frame.searchBox then
-                    SpoilscribeDB.searchFields = SpoilscribeDB.searchFields or {}
-                    SpoilscribeDB.searchFields.itemName = true
-                    frame.searchBox:SetText(searchName)
-                    frame.searchBox:SetCursorPosition(0)
-                end
-            end)
-
-            rows[i] = row
+    -- Group items by slot.
+    local slotOrder = {}
+    local slotGroups = {}
+    for _, item in ipairs(items) do
+        local slot = (item.slot and item.slot ~= "") and item.slot or "Other"
+        if not slotGroups[slot] then
+            slotGroups[slot] = {}
+            slotOrder[#slotOrder + 1] = slot
         end
-
-        row.itemID = item.itemID
-        row._itemName = item.itemName or ""
-        row.itemLink = item.itemLink
-
-        local name = Spoilscribe:GetQualityColoredItemText({
-            link    = item.itemLink,
-            name    = item.itemName,
-            itemID  = item.itemID,
-        })
-        row.text:SetText(name:gsub("[%[%]]", ""))
-
-        if item.icon then
-            row.icon:SetTexture(item.icon)
-            row.icon:Show()
-            row.bg:Show()
-            local hexColor = type(item) == "table" and item.itemQuality
-            if hexColor and type(hexColor) == "string" and #hexColor == 8 then
-                local r = tonumber(hexColor:sub(3, 4), 16) / 255
-                local g = tonumber(hexColor:sub(5, 6), 16) / 255
-                local b = tonumber(hexColor:sub(7, 8), 16) / 255
-                row.IconBorder:SetVertexColor(r, g, b)
-                row.IconBorder:Show()
-            elseif hexColor and type(hexColor) == "number" and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[hexColor] then
-                local c = ITEM_QUALITY_COLORS[hexColor]
-                row.IconBorder:SetVertexColor(c.r, c.g, c.b)
-                row.IconBorder:Show()
-            else
-                row.IconBorder:Hide()
-            end
-        else
-            row.icon:Hide()
-            row.IconBorder:Hide()
-            row.bg:Hide()
-        end
-
-        row:EnableMouse(true)
-        row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, y)
-        row:Show()
-        y = y - ROW_HEIGHT - 2
+        slotGroups[slot][#slotGroups[slot] + 1] = item
     end
 
-    content:SetHeight(math.max(1, #items * (ROW_HEIGHT + 2)))
+    local ICON_SIZE = 32
+    local ROW_HEIGHT = 36
+    local HEADER_HEIGHT = 24
+    local y = 0
+    local rowIndex = 0
+
+    for _, slot in ipairs(slotOrder) do
+        -- Render slot header.
+        rowIndex = rowIndex + 1
+        local header = rows[rowIndex]
+        if not header then
+            header = CreateFrame("Frame", nil, content)
+            header:SetSize(210, HEADER_HEIGHT)
+
+            header.text = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            header.text:SetPoint("BOTTOM", header, "BOTTOM", 0, 6)
+            header.text:SetJustifyH("CENTER")
+
+            header.divider = header:CreateTexture(nil, "ARTWORK")
+            header.divider:SetAtlas("Adventure-MissionEnd-Line")
+            header.divider:SetHeight(4)
+            header.divider:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", 0, 2)
+            header.divider:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", 0, 2)
+
+            rows[rowIndex] = header
+        end
+
+        -- Reset header (hide item-specific elements if this row was previously an item row).
+        if header.icon then header.icon:Hide() end
+        if header.IconBorder then header.IconBorder:Hide() end
+        if header.bg then header.bg:Hide() end
+        if header.highlight then header.highlight:Hide() end
+        header:EnableMouse(false)
+
+        header.text:SetText(slot)
+        header.text:SetTextColor(1, 0.82, 0)
+        if header.divider then header.divider:Show() end
+        header:ClearAllPoints()
+        header:SetPoint("TOPLEFT", content, "TOPLEFT", 0, y)
+        header:Show()
+        y = y - HEADER_HEIGHT
+
+        -- Render items in this slot group.
+        for _, item in ipairs(slotGroups[slot]) do
+            rowIndex = rowIndex + 1
+            local row = rows[rowIndex]
+            if not row then
+                row = CreateFrame("Button", nil, content, "BackdropTemplate")
+                row:SetSize(210, ROW_HEIGHT)
+
+                row.bg = row:CreateTexture(nil, "BACKGROUND")
+                row.bg:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+                row.bg:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
+                row.bg:SetHeight(ROW_HEIGHT)
+                row.bg:SetAtlas("GarrMissionLocation-Maw-ButtonBG")
+
+                row.highlight = row:CreateTexture(nil, "HIGHLIGHT")
+                row.highlight:SetAllPoints(row.bg)
+                row.highlight:SetAtlas("Adventures_MissionList_Highlight")
+
+                row.icon = row:CreateTexture(nil, "ARTWORK")
+                row.icon:SetSize(ICON_SIZE, ICON_SIZE)
+                row.icon:SetPoint("TOPLEFT", row, "TOPLEFT", 2, -2)
+
+                row.IconBorder = row:CreateTexture(nil, "OVERLAY")
+                row.IconBorder:SetTexture("Interface/Common/WhiteIconFrame")
+                row.IconBorder:SetSize(ICON_SIZE, ICON_SIZE)
+                row.IconBorder:SetAllPoints(row.icon)
+                row.IconBorder:Hide()
+
+                row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
+                row.text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+                row.text:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+                row.text:SetJustifyH("LEFT")
+                row.text:SetJustifyV("MIDDLE")
+
+                row:SetScript("OnEnter", function(self)
+                    if not (self.itemLink or self.itemID) then return end
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    if self.itemLink and self.itemLink ~= "" then
+                        GameTooltip:SetHyperlink(self.itemLink)
+                    elseif self.itemID then
+                        GameTooltip:SetItemByID(self.itemID)
+                    end
+                    GameTooltip:Show()
+                end)
+                row:SetScript("OnLeave", function()
+                    GameTooltip:Hide()
+                end)
+                row:SetScript("OnClick", function(self)
+                    local searchName = self._itemName
+                    if searchName and searchName ~= "" and frame.searchBox then
+                        SpoilscribeDB.searchFields = SpoilscribeDB.searchFields or {}
+                        SpoilscribeDB.searchFields.itemName = true
+                        frame.searchBox:SetText(searchName)
+                        frame.searchBox:SetCursorPosition(0)
+                    end
+                end)
+
+                rows[rowIndex] = row
+            end
+
+            -- Reset header elements if this row was previously a header.
+            if row.divider then row.divider:Hide() end
+            if row.bg then row.bg:Show() end
+            if row.highlight then row.highlight:Show() end
+            row:EnableMouse(true)
+
+            row.itemID = item.itemID
+            row._itemName = item.itemName or ""
+            row.itemLink = item.itemLink
+
+            local name = Spoilscribe:GetQualityColoredItemText({
+                link    = item.itemLink,
+                name    = item.itemName,
+                itemID  = item.itemID,
+            })
+            row.text:SetText(name:gsub("[%[%]]", ""))
+
+            if item.icon then
+                row.icon:SetTexture(item.icon)
+                row.icon:Show()
+                local hexColor = type(item) == "table" and item.itemQuality
+                if hexColor and type(hexColor) == "string" and #hexColor == 8 then
+                    local r = tonumber(hexColor:sub(3, 4), 16) / 255
+                    local g = tonumber(hexColor:sub(5, 6), 16) / 255
+                    local b = tonumber(hexColor:sub(7, 8), 16) / 255
+                    row.IconBorder:SetVertexColor(r, g, b)
+                    row.IconBorder:Show()
+                elseif hexColor and type(hexColor) == "number" and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[hexColor] then
+                    local c = ITEM_QUALITY_COLORS[hexColor]
+                    row.IconBorder:SetVertexColor(c.r, c.g, c.b)
+                    row.IconBorder:Show()
+                else
+                    row.IconBorder:Hide()
+                end
+            else
+                row.icon:Hide()
+                row.IconBorder:Hide()
+            end
+
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, y)
+            row:Show()
+            y = y - ROW_HEIGHT - 2
+        end
+    end
+
+    content:SetHeight(math.max(1, math.abs(y)))
 end
