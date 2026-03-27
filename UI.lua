@@ -704,6 +704,10 @@ function UI:RenderPage()
                         SpoilscribeDB.favorites[id] = nil
                         self:GetNormalTexture():SetDesaturated(true)
                         self:GetNormalTexture():SetAlpha(0.3)
+                        -- If the unfavorited item was pinned, return to normal view.
+                        if frame._pinnedItem and frame._pinnedItem.itemID == id then
+                            Spoilscribe:RefreshLoot()
+                        end
                     else
                         SpoilscribeDB.favorites[id] = true
                         self:GetNormalTexture():SetDesaturated(false)
@@ -905,10 +909,37 @@ function UI:RenderFavorites()
         return
     end
 
-    -- Group items by slot.
+    -- Detect current dungeon via instance info.
+    local currentDungeonName = nil
+    if GetInstanceInfo then
+        local instanceName, instanceType = GetInstanceInfo()
+        if instanceName and instanceType == "party" then
+            -- Match against known dungeon names (case-insensitive).
+            local lowerInstance = string.lower(instanceName)
+            for _, item in ipairs(items) do
+                if item.dungeonName and string.lower(item.dungeonName) == lowerInstance then
+                    currentDungeonName = item.dungeonName
+                    break
+                end
+            end
+        end
+    end
+
+    -- Split items: current dungeon vs rest.
+    local currentDungeonItems = {}
+    local remainingItems = {}
+    for _, item in ipairs(items) do
+        if currentDungeonName and item.dungeonName == currentDungeonName then
+            currentDungeonItems[#currentDungeonItems + 1] = item
+        else
+            remainingItems[#remainingItems + 1] = item
+        end
+    end
+
+    -- Group remaining items by slot.
     local slotOrder = {}
     local slotGroups = {}
-    for _, item in ipairs(items) do
+    for _, item in ipairs(remainingItems) do
         local slot = (item.slot and item.slot ~= "") and item.slot or "Other"
         if not slotGroups[slot] then
             slotGroups[slot] = {}
@@ -923,149 +954,177 @@ function UI:RenderFavorites()
     local y = 0
     local rowIndex = 0
 
-    for _, slot in ipairs(slotOrder) do
-        -- Render slot header.
+    -- Unified row factory – every pooled frame is a Button with all elements
+    -- so headers and items can freely swap positions on re-render.
+    local function EnsureRow()
         rowIndex = rowIndex + 1
-        local header = rows[rowIndex]
-        if not header then
-            header = CreateFrame("Frame", nil, content)
-            header:SetSize(210, HEADER_HEIGHT)
+        local row = rows[rowIndex]
+        if row then return row end
 
-            header.text = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            header.text:SetPoint("BOTTOM", header, "BOTTOM", 0, 6)
-            header.text:SetJustifyH("CENTER")
+        row = CreateFrame("Button", nil, content, "BackdropTemplate")
+        row:SetSize(210, ROW_HEIGHT)
 
-            header.divider = header:CreateTexture(nil, "ARTWORK")
-            header.divider:SetAtlas("Adventure-MissionEnd-Line")
-            header.divider:SetHeight(4)
-            header.divider:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", 0, 2)
-            header.divider:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", 0, 2)
+        -- Header elements
+        row.headerText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        row.headerText:SetPoint("BOTTOM", row, "BOTTOM", 0, 6)
+        row.headerText:SetJustifyH("CENTER")
 
-            rows[rowIndex] = header
+        row.divider = row:CreateTexture(nil, "ARTWORK")
+        row.divider:SetAtlas("Adventure-MissionEnd-Line")
+        row.divider:SetHeight(4)
+        row.divider:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 2)
+        row.divider:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 2)
+
+        -- Item elements
+        row.bg = row:CreateTexture(nil, "BACKGROUND")
+        row.bg:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+        row.bg:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
+        row.bg:SetHeight(ROW_HEIGHT)
+        row.bg:SetAtlas("GarrMissionLocation-Maw-ButtonBG")
+
+        row.highlight = row:CreateTexture(nil, "HIGHLIGHT")
+        row.highlight:SetAllPoints(row.bg)
+        row.highlight:SetAtlas("Adventures_MissionList_Highlight")
+
+        row.icon = row:CreateTexture(nil, "ARTWORK")
+        row.icon:SetSize(ICON_SIZE, ICON_SIZE)
+        row.icon:SetPoint("TOPLEFT", row, "TOPLEFT", 2, -2)
+
+        row.IconBorder = row:CreateTexture(nil, "OVERLAY")
+        row.IconBorder:SetTexture("Interface/Common/WhiteIconFrame")
+        row.IconBorder:SetSize(ICON_SIZE, ICON_SIZE)
+        row.IconBorder:SetAllPoints(row.icon)
+        row.IconBorder:Hide()
+
+        row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
+        row.text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+        row.text:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+        row.text:SetJustifyH("LEFT")
+        row.text:SetJustifyV("MIDDLE")
+
+        row:SetScript("OnEnter", function(self)
+            if not (self.itemLink or self.itemID) then return end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            if self.itemLink and self.itemLink ~= "" then
+                GameTooltip:SetHyperlink(self.itemLink)
+            elseif self.itemID then
+                GameTooltip:SetItemByID(self.itemID)
+            end
+            GameTooltip:Show()
+        end)
+        row:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+        row:SetScript("OnClick", function(self)
+            if not self.itemID then return end
+            local pinnedItem = self._pinnedData
+            if pinnedItem then
+                frame._pinnedItem = pinnedItem
+                local lines = {
+                    { type = "header", text = pinnedItem.dungeonName or "" },
+                    pinnedItem,
+                }
+                Spoilscribe.UI:RenderLoot(lines)
+            end
+        end)
+
+        rows[rowIndex] = row
+        return row
+    end
+
+    local function RenderHeader(label)
+        local row = EnsureRow()
+        row:SetSize(210, HEADER_HEIGHT)
+
+        -- Hide item elements
+        row.bg:Hide()
+        row.highlight:Hide()
+        row.icon:Hide()
+        row.IconBorder:Hide()
+        row.text:Hide()
+        row:EnableMouse(false)
+        row.itemID = nil
+        row.itemLink = nil
+        row._pinnedData = nil
+
+        -- Show header elements
+        row.headerText:SetText(label)
+        row.headerText:SetTextColor(1, 0.82, 0)
+        row.headerText:Show()
+        row.divider:Show()
+
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, y)
+        row:Show()
+        y = y - HEADER_HEIGHT
+    end
+
+    local function RenderItemRow(item)
+        local row = EnsureRow()
+        row:SetSize(210, ROW_HEIGHT)
+
+        -- Hide header elements
+        row.headerText:Hide()
+        row.divider:Hide()
+
+        -- Show item elements
+        row.bg:Show()
+        row.highlight:Show()
+        row:EnableMouse(true)
+
+        row.itemID = item.itemID
+        row._itemName = item.itemName or ""
+        row._pinnedData = item
+        row.itemLink = item.itemLink
+
+        local name = Spoilscribe:GetQualityColoredItemText({
+            link    = item.itemLink,
+            name    = item.itemName,
+            itemID  = item.itemID,
+        })
+        row.text:SetText(name:gsub("[%[%]]", ""))
+        row.text:Show()
+
+        if item.icon then
+            row.icon:SetTexture(item.icon)
+            row.icon:Show()
+            local hexColor = type(item) == "table" and item.itemQuality
+            if hexColor and type(hexColor) == "string" and #hexColor == 8 then
+                local r = tonumber(hexColor:sub(3, 4), 16) / 255
+                local g = tonumber(hexColor:sub(5, 6), 16) / 255
+                local b = tonumber(hexColor:sub(7, 8), 16) / 255
+                row.IconBorder:SetVertexColor(r, g, b)
+                row.IconBorder:Show()
+            elseif hexColor and type(hexColor) == "number" and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[hexColor] then
+                local c = ITEM_QUALITY_COLORS[hexColor]
+                row.IconBorder:SetVertexColor(c.r, c.g, c.b)
+                row.IconBorder:Show()
+            else
+                row.IconBorder:Hide()
+            end
+        else
+            row.icon:Hide()
+            row.IconBorder:Hide()
         end
 
-        -- Reset header (hide item-specific elements if this row was previously an item row).
-        if header.icon then header.icon:Hide() end
-        if header.IconBorder then header.IconBorder:Hide() end
-        if header.bg then header.bg:Hide() end
-        if header.highlight then header.highlight:Hide() end
-        header:EnableMouse(false)
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, y)
+        row:Show()
+        y = y - ROW_HEIGHT - 2
+    end
 
-        header.text:SetText(slot)
-        header.text:SetTextColor(1, 0.82, 0)
-        if header.divider then header.divider:Show() end
-        header:ClearAllPoints()
-        header:SetPoint("TOPLEFT", content, "TOPLEFT", 0, y)
-        header:Show()
-        y = y - HEADER_HEIGHT
+    -- Render "Current Dungeon" section at the top (flat, not categorized).
+    if #currentDungeonItems > 0 then
+        RenderHeader("Current Dungeon")
+        for _, item in ipairs(currentDungeonItems) do
+            RenderItemRow(item)
+        end
+    end
 
-        -- Render items in this slot group.
+    for _, slot in ipairs(slotOrder) do
+        RenderHeader(slot)
         for _, item in ipairs(slotGroups[slot]) do
-            rowIndex = rowIndex + 1
-            local row = rows[rowIndex]
-            if not row then
-                row = CreateFrame("Button", nil, content, "BackdropTemplate")
-                row:SetSize(210, ROW_HEIGHT)
-
-                row.bg = row:CreateTexture(nil, "BACKGROUND")
-                row.bg:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
-                row.bg:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
-                row.bg:SetHeight(ROW_HEIGHT)
-                row.bg:SetAtlas("GarrMissionLocation-Maw-ButtonBG")
-
-                row.highlight = row:CreateTexture(nil, "HIGHLIGHT")
-                row.highlight:SetAllPoints(row.bg)
-                row.highlight:SetAtlas("Adventures_MissionList_Highlight")
-
-                row.icon = row:CreateTexture(nil, "ARTWORK")
-                row.icon:SetSize(ICON_SIZE, ICON_SIZE)
-                row.icon:SetPoint("TOPLEFT", row, "TOPLEFT", 2, -2)
-
-                row.IconBorder = row:CreateTexture(nil, "OVERLAY")
-                row.IconBorder:SetTexture("Interface/Common/WhiteIconFrame")
-                row.IconBorder:SetSize(ICON_SIZE, ICON_SIZE)
-                row.IconBorder:SetAllPoints(row.icon)
-                row.IconBorder:Hide()
-
-                row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
-                row.text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
-                row.text:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-                row.text:SetJustifyH("LEFT")
-                row.text:SetJustifyV("MIDDLE")
-
-                row:SetScript("OnEnter", function(self)
-                    if not (self.itemLink or self.itemID) then return end
-                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                    if self.itemLink and self.itemLink ~= "" then
-                        GameTooltip:SetHyperlink(self.itemLink)
-                    elseif self.itemID then
-                        GameTooltip:SetItemByID(self.itemID)
-                    end
-                    GameTooltip:Show()
-                end)
-                row:SetScript("OnLeave", function()
-                    GameTooltip:Hide()
-                end)
-                row:SetScript("OnClick", function(self)
-                    if not self.itemID then return end
-                    local pinnedItem = self._pinnedData
-                    if pinnedItem then
-                        frame._pinnedItem = pinnedItem
-                        local lines = {
-                            { type = "header", text = pinnedItem.dungeonName or "" },
-                            pinnedItem,
-                        }
-                        Spoilscribe.UI:RenderLoot(lines)
-                    end
-                end)
-
-                rows[rowIndex] = row
-            end
-
-            -- Reset header elements if this row was previously a header.
-            if row.divider then row.divider:Hide() end
-            if row.bg then row.bg:Show() end
-            if row.highlight then row.highlight:Show() end
-            row:EnableMouse(true)
-
-            row.itemID = item.itemID
-            row._itemName = item.itemName or ""
-            row._pinnedData = item
-            row.itemLink = item.itemLink
-
-            local name = Spoilscribe:GetQualityColoredItemText({
-                link    = item.itemLink,
-                name    = item.itemName,
-                itemID  = item.itemID,
-            })
-            row.text:SetText(name:gsub("[%[%]]", ""))
-
-            if item.icon then
-                row.icon:SetTexture(item.icon)
-                row.icon:Show()
-                local hexColor = type(item) == "table" and item.itemQuality
-                if hexColor and type(hexColor) == "string" and #hexColor == 8 then
-                    local r = tonumber(hexColor:sub(3, 4), 16) / 255
-                    local g = tonumber(hexColor:sub(5, 6), 16) / 255
-                    local b = tonumber(hexColor:sub(7, 8), 16) / 255
-                    row.IconBorder:SetVertexColor(r, g, b)
-                    row.IconBorder:Show()
-                elseif hexColor and type(hexColor) == "number" and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[hexColor] then
-                    local c = ITEM_QUALITY_COLORS[hexColor]
-                    row.IconBorder:SetVertexColor(c.r, c.g, c.b)
-                    row.IconBorder:Show()
-                else
-                    row.IconBorder:Hide()
-                end
-            else
-                row.icon:Hide()
-                row.IconBorder:Hide()
-            end
-
-            row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, y)
-            row:Show()
-            y = y - ROW_HEIGHT - 2
+            RenderItemRow(item)
         end
     end
 
