@@ -28,6 +28,7 @@ Spoilscribe.Data.Filters = {
         "One-Hand",
         "Two-Hand",
         "Off-Hand",
+        "Ranged",
     },
     secondaryStats = {
         "Any Stats",
