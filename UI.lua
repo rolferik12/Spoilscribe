@@ -587,6 +587,25 @@ function UI:RenderPage()
                 row:SetScript("OnLeave", function()
                     GameTooltip:Hide()
                 end)
+
+                row.favBtn = CreateFrame("Button", nil, row)
+                row.favBtn:SetSize(20, 18)
+                row.favBtn:SetPoint("TOPRIGHT", row, "TOPRIGHT", -2, -3)
+                row.favBtn:SetNormalAtlas("auctionhouse-icon-favorite-off")
+                row.favBtn:SetScript("OnClick", function(self)
+                    local id = self:GetParent().itemID
+                    if not id then return end
+                    SpoilscribeDB.favorites = SpoilscribeDB.favorites or {}
+                    if SpoilscribeDB.favorites[id] then
+                        SpoilscribeDB.favorites[id] = nil
+                        self:SetNormalAtlas("auctionhouse-icon-favorite-off")
+                    else
+                        SpoilscribeDB.favorites[id] = true
+                        self:SetNormalAtlas("auctionhouse-icon-favorite")
+                    end
+                end)
+                row.favBtn:Hide()
+
                 frame.rows[rowIndex] = row
             end
 
@@ -602,6 +621,7 @@ function UI:RenderPage()
             if row.headerLine then row.headerLine:Hide() end
             if row.headerBg then row.headerBg:Hide() end
             if row.headerText then row.headerText:SetText(""); row.headerText:Hide() end
+            if row.favBtn then row.favBtn:Hide() end
 
             local text = ""
             local showIcon = false
@@ -717,6 +737,22 @@ function UI:RenderPage()
             end
 
             row:EnableMouse(row.itemID ~= nil or (row.itemLink ~= nil and row.itemLink ~= ""))
+
+            -- Update favorite button.
+            if row.favBtn then
+                if row.itemID then
+                    SpoilscribeDB.favorites = SpoilscribeDB.favorites or {}
+                    if SpoilscribeDB.favorites[row.itemID] then
+                        row.favBtn:SetNormalAtlas("auctionhouse-icon-favorite")
+                    else
+                        row.favBtn:SetNormalAtlas("auctionhouse-icon-favorite-off")
+                    end
+                    row.favBtn:Show()
+                else
+                    row.favBtn:Hide()
+                end
+            end
+
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", frame.content, "TOPLEFT", xOffset, y)
             row.text:SetText(text:gsub("[%[%]]", ""))

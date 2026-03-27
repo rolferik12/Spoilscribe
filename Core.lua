@@ -8,6 +8,7 @@ local _hadMissingLinks = false
 -- Guard to prevent re-entrancy during scanning.
 local _isScanning = false
 SpoilscribeDB = SpoilscribeDB or {}
+SpoilscribeDB.favorites = SpoilscribeDB.favorites or {}
 
 -- Build the player's specialization list at runtime.
 -- Returns an array: { {label="All Specs", classID=0, specID=0}, {label="Frost", classID=6, specID=251}, ... }
