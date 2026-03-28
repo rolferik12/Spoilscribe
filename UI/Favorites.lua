@@ -114,33 +114,45 @@ function Favorites:CreateZoomButton(frame, slideBtn)
         GameTooltip:Hide()
     end)
     zoomBtn:SetScript("OnClick", function()
-        local items = Spoilscribe:GetFavoriteItems()
-        if #items == 0 then return end
-
-        local dungeonOrder = {}
-        local dungeonGroups = {}
-        for _, item in ipairs(items) do
-            local dn = item.dungeonName or "Unknown"
-            if not dungeonGroups[dn] then
-                dungeonGroups[dn] = {}
-                dungeonOrder[#dungeonOrder + 1] = dn
-            end
-            dungeonGroups[dn][#dungeonGroups[dn] + 1] = item
-        end
-
-        local lines = {}
-        for _, dn in ipairs(dungeonOrder) do
-            lines[#lines + 1] = { type = "header", text = dn }
-            for _, item in ipairs(dungeonGroups[dn]) do
-                lines[#lines + 1] = item
-            end
-        end
-        frame._hasFilter = true
-        UI:RenderLoot(lines)
+        UI:ZoomFavorites()
     end)
     frame.zoomBtn = zoomBtn
 
     return zoomBtn
+end
+
+function UI:ZoomFavorites()
+    local frame = self.frame
+    if not frame then return end
+
+    local items = Spoilscribe:GetFavoriteItems()
+    if #items == 0 then
+        frame._zoomedFavorites = false
+        Spoilscribe:RefreshLoot()
+        return
+    end
+
+    local dungeonOrder = {}
+    local dungeonGroups = {}
+    for _, item in ipairs(items) do
+        local dn = item.dungeonName or "Unknown"
+        if not dungeonGroups[dn] then
+            dungeonGroups[dn] = {}
+            dungeonOrder[#dungeonOrder + 1] = dn
+        end
+        dungeonGroups[dn][#dungeonGroups[dn] + 1] = item
+    end
+
+    local lines = {}
+    for _, dn in ipairs(dungeonOrder) do
+        lines[#lines + 1] = { type = "header", text = dn }
+        for _, item in ipairs(dungeonGroups[dn]) do
+            lines[#lines + 1] = item
+        end
+    end
+    frame._hasFilter = true
+    frame._zoomedFavorites = true
+    UI:RenderLoot(lines)
 end
 
 function UI:RenderFavorites()
@@ -270,7 +282,11 @@ function UI:RenderFavorites()
                 SpoilscribeCharDB.favorites[self.itemID] = nil
                 UI:RenderFavorites()
                 slideOut:UpdateBackground()
-                UI:RenderPage()
+                if frame._zoomedFavorites then
+                    UI:ZoomFavorites()
+                else
+                    UI:RenderPage()
+                end
                 Spoilscribe:BroadcastFavorites()
                 return
             end

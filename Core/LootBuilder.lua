@@ -81,6 +81,7 @@ function Spoilscribe:RefreshLoot()
     -- Clear any pinned favorite item so normal filtering resumes.
     if self.UI.frame then
         self.UI.frame._pinnedItem = nil
+        self.UI.frame._zoomedFavorites = false
     end
 
     local ok, lines = pcall(function()

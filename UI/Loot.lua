@@ -81,6 +81,7 @@ function UI:CreateResultArea(frame)
     end)
     clearFilterBtn:SetScript("OnClick", function()
         frame._hasFilter = false
+        frame._zoomedFavorites = false
         -- Reset dropdowns to defaults.
         frame.selectedDifficultyIndex = 1
         frame.difficultyDropdown.selectedIndex = 1
@@ -346,7 +347,9 @@ function UI:CreateLootRow(frame)
             SpoilscribeCharDB.favorites[id] = nil
             self:GetNormalTexture():SetDesaturated(true)
             self:GetNormalTexture():SetAlpha(0.3)
-            if frame._pinnedItem and frame._pinnedItem.itemID == id then
+            if frame._zoomedFavorites then
+                Spoilscribe.UI:ZoomFavorites()
+            elseif frame._pinnedItem and frame._pinnedItem.itemID == id then
                 Spoilscribe:RefreshLoot()
             end
         else
