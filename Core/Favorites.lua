@@ -66,3 +66,63 @@ function Spoilscribe:GetFavoriteDungeonNames()
     end
     return result
 end
+
+-- Returns favorite items from all party members, resolved from the loot cache.
+-- Only includes items from senders whose broadcast difficulty matches the viewer's selection.
+-- Each result includes a .sender field with the party member's name.
+function Spoilscribe:GetPartyFavoriteItems()
+    if not self._partyFavItems or not next(self._partyFavItems) then return {} end
+
+    -- Determine the viewer's selected difficulty.
+    local frame = self.UI and self.UI.frame
+    local viewerDiffId = 23
+    if frame then
+        local difficulty = self.Data.Difficulties[frame.selectedDifficultyIndex or 1]
+        viewerDiffId = difficulty and difficulty.id or 23
+    end
+
+    -- Build a lookup of itemID -> item data from the matching difficulty cache only.
+    local itemLookup = {}
+    local specs = self:GetSpecList()
+    for _, spec in ipairs(specs) do
+        local key = self:CacheKey(viewerDiffId, spec.specID)
+        local dungeons = self._lootCache[key]
+        if dungeons then
+            for _, dungeonEntry in ipairs(dungeons) do
+                for _, item in ipairs(dungeonEntry.items) do
+                    if item.itemID and not itemLookup[item.itemID] then
+                        itemLookup[item.itemID] = {
+                            type        = "item",
+                            itemID      = item.itemID,
+                            itemLink    = item.itemLink,
+                            itemName    = item.itemName,
+                            itemQuality = item.itemQuality,
+                            icon        = item.icon,
+                            slot        = item.slot or "",
+                            armorType   = item.armorType or "",
+                            bossName    = item.bossName,
+                            dungeonName = dungeonEntry.dungeonName,
+                        }
+                    end
+                end
+            end
+        end
+    end
+
+    local results = {}
+    for sender, data in pairs(self._partyFavItems) do
+        -- Only show items from senders whose difficulty matches ours.
+        if data.diffId == viewerDiffId then
+            for id in pairs(data.items) do
+                local cached = itemLookup[id]
+                if cached then
+                    local entry = {}
+                    for k, v in pairs(cached) do entry[k] = v end
+                    entry.sender = sender
+                    results[#results + 1] = entry
+                end
+            end
+        end
+    end
+    return results
+end

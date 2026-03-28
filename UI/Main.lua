@@ -69,6 +69,7 @@ function UI:CreateMainFrame()
         function(index)
             frame.selectedDifficultyIndex = index
             Spoilscribe:RefreshLoot()
+            Spoilscribe:BroadcastFavorites()
         end
     )
     frame.difficultyDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", dropdownOffsets[1], -23)
@@ -138,7 +139,8 @@ function UI:CreateMainFrame()
     -- Favorites panel (from UIFavorites).
     local slideOut = UI.Favorites:CreatePanel(frame)
     local slideBtn = UI.Favorites:CreateToggleButton(frame, slideOut)
-    UI.Favorites:CreateZoomButton(frame, slideBtn)
+    local zoomBtn = UI.Favorites:CreateZoomButton(frame, slideBtn)
+    UI.Favorites:CreateAssistButton(frame, zoomBtn)
 
     self.frame = frame
     return frame
@@ -172,6 +174,7 @@ function UI:ToggleMainFrame()
 
         frame:Show()
         PlaySound(SOUNDKIT.IG_QUEST_LOG_OPEN)
+        UI.Favorites:UpdateAssistButton(frame)
         if SpoilscribeCharDB.favoritesOpen and frame.SetFavoritesOpen then
             frame.SetFavoritesOpen(true)
         end

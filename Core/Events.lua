@@ -25,6 +25,9 @@ f:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
     if event == "GROUP_ROSTER_UPDATE" then
         Spoilscribe:PrunePartyMembers()
         Spoilscribe:BroadcastFavorites()
+        if Spoilscribe.UI and Spoilscribe.UI.Favorites and Spoilscribe.UI.frame then
+            Spoilscribe.UI.Favorites:UpdateAssistButton(Spoilscribe.UI.frame)
+        end
         return
     end
 

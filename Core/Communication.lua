@@ -28,6 +28,21 @@ function Spoilscribe:BroadcastFavorites()
     local payload = "FAV:" .. table.concat(parts, ",")
     local channel = IsInGroup(LE_PARTY_CATEGORY_INSTANCE) and "INSTANCE_CHAT" or "PARTY"
     C_ChatInfo.SendAddonMessage(COMM_PREFIX, payload, channel)
+
+    -- Also broadcast individual item IDs with the selected difficulty.
+    SpoilscribeCharDB.favorites = SpoilscribeCharDB.favorites or {}
+    local ids = {}
+    for id in pairs(SpoilscribeCharDB.favorites) do
+        ids[#ids + 1] = tostring(id)
+    end
+    local frame = self.UI and self.UI.frame
+    local diffId = 23
+    if frame then
+        local difficulty = self.Data.Difficulties[frame.selectedDifficultyIndex or 1]
+        diffId = difficulty and difficulty.id or 23
+    end
+    local itemPayload = "ITEMS:" .. tostring(diffId) .. ":" .. table.concat(ids, ",")
+    C_ChatInfo.SendAddonMessage(COMM_PREFIX, itemPayload, channel)
 end
 
 function Spoilscribe:RequestPartyFavorites()
@@ -55,6 +70,38 @@ function Spoilscribe:HandleCommReceived(prefix, message, _, sender)
     -- Handle sync request: another client reloaded and wants our favorites.
     if message == "REQ" then
         self:BroadcastFavorites()
+        return
+    end
+
+    -- Handle item ID list from party members: ITEMS:diffId:id1,id2,...
+    if message and message:sub(1, 6) == "ITEMS:" then
+        local rest = message:sub(7)
+        local diffStr, itemBody = rest:match("^(%d+):(.*)$")
+        local diffId = tonumber(diffStr)
+        if not diffId then
+            -- Backwards compat: no difficulty prefix.
+            diffId = 23
+            itemBody = rest
+        end
+        local items = {}
+        if itemBody and itemBody ~= "" then
+            for idStr in itemBody:gmatch("%d+") do
+                local id = tonumber(idStr)
+                if id then
+                    items[id] = true
+                end
+            end
+        end
+        if next(items) then
+            self._partyFavItems[sender] = { diffId = diffId, items = items }
+        else
+            self._partyFavItems[sender] = nil
+        end
+        if self.UI and self.UI.frame and self.UI.frame:IsShown() then
+            if self.UI.frame._zoomedPartyFavorites then
+                self.UI:ZoomPartyFavorites()
+            end
+        end
         return
     end
 
@@ -102,9 +149,11 @@ function Spoilscribe:PrunePartyMembers()
             local shortName = sender:match("^([^-]+)") or sender
             if not validNames[sender] and not validNames[shortName] then
                 self._partyFavDungeons[sender] = nil
+                self._partyFavItems[sender] = nil
             end
         end
     else
         wipe(self._partyFavDungeons)
+        wipe(self._partyFavItems)
     end
 end

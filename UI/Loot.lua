@@ -82,6 +82,7 @@ function UI:CreateResultArea(frame)
     clearFilterBtn:SetScript("OnClick", function()
         frame._hasFilter = false
         frame._zoomedFavorites = false
+        frame._zoomedPartyFavorites = false
         -- Reset dropdowns to defaults.
         frame.selectedDifficultyIndex = 1
         frame.difficultyDropdown.selectedIndex = 1

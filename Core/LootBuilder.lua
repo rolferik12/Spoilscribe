@@ -82,6 +82,7 @@ function Spoilscribe:RefreshLoot()
     if self.UI.frame then
         self.UI.frame._pinnedItem = nil
         self.UI.frame._zoomedFavorites = false
+        self.UI.frame._zoomedPartyFavorites = false
     end
 
     local ok, lines = pcall(function()

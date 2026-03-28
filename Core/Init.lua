@@ -11,6 +11,7 @@ Spoilscribe._lootCache = {}
 Spoilscribe._hadMissingLinks = false
 Spoilscribe._isScanning = false
 Spoilscribe._partyFavDungeons = {}
+Spoilscribe._partyFavItems = {}
 
 function Spoilscribe:LogToConsole(message)
     if DEFAULT_CHAT_FRAME then

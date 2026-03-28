@@ -48,8 +48,8 @@ end
 
 function Favorites:CreateToggleButton(frame, slideOut)
     local slideBtn = CreateFrame("Button", nil, frame)
-    slideBtn:SetSize(48, 40)
-    slideBtn:SetPoint("RIGHT", frame, "RIGHT", 41, 93)
+    slideBtn:SetSize(68, 60)
+    slideBtn:SetPoint("RIGHT", frame, "RIGHT", 61, 93)
     slideBtn:SetNormalAtlas("HordeFrame_Title-end")
     slideBtn:SetHighlightAtlas("HordeFrame_Title-end")
     slideBtn:GetHighlightTexture():SetAlpha(0.4)
@@ -57,7 +57,7 @@ function Favorites:CreateToggleButton(frame, slideOut)
 
     local slideBtnIcon = slideBtn:CreateTexture(nil, "OVERLAY")
     slideBtnIcon:SetAtlas("crosshair_directions_128")
-    slideBtnIcon:SetSize(20, 20)
+    slideBtnIcon:SetSize(25, 25)
     slideBtnIcon:SetPoint("CENTER", slideBtn, "CENTER", -8, 3)
     slideBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -73,11 +73,11 @@ function Favorites:CreateToggleButton(frame, slideOut)
             slideOut:Show()
             UI:RenderFavorites()
             slideBtn:ClearAllPoints()
-            slideBtn:SetPoint("RIGHT", slideOut, "RIGHT", 41, 93)
+            slideBtn:SetPoint("RIGHT", slideOut, "RIGHT", 61, 93)
         else
             slideOut:Hide()
             slideBtn:ClearAllPoints()
-            slideBtn:SetPoint("RIGHT", frame, "RIGHT", 41, 93)
+            slideBtn:SetPoint("RIGHT", frame, "RIGHT", 61, 93)
         end
         SpoilscribeCharDB.favoritesOpen = open and true or false
     end
@@ -93,7 +93,7 @@ end
 
 function Favorites:CreateZoomButton(frame, slideBtn)
     local zoomBtn = CreateFrame("Button", nil, frame)
-    zoomBtn:SetSize(48, 40)
+    zoomBtn:SetSize(68, 60)
     zoomBtn:SetPoint("TOP", slideBtn, "BOTTOM", 0, 0)
     zoomBtn:SetNormalAtlas("HordeFrame_Title-end")
     zoomBtn:SetHighlightAtlas("HordeFrame_Title-end")
@@ -102,7 +102,7 @@ function Favorites:CreateZoomButton(frame, slideBtn)
 
     local zoomBtnIcon = zoomBtn:CreateTexture(nil, "OVERLAY")
     zoomBtnIcon:SetAtlas("Crosshair_pickup_48")
-    zoomBtnIcon:SetSize(20, 20)
+    zoomBtnIcon:SetSize(25, 25)
     zoomBtnIcon:SetPoint("CENTER", zoomBtn, "CENTER", -8, 3)
 
     zoomBtn:SetScript("OnEnter", function(self)
@@ -119,6 +119,46 @@ function Favorites:CreateZoomButton(frame, slideBtn)
     frame.zoomBtn = zoomBtn
 
     return zoomBtn
+end
+
+function Favorites:CreateAssistButton(frame, zoomBtn)
+    local assistBtn = CreateFrame("Button", nil, frame)
+    assistBtn:SetSize(68, 60)
+    assistBtn:SetPoint("TOP", zoomBtn, "BOTTOM", 0, 0)
+    assistBtn:SetNormalAtlas("HordeFrame_Title-end")
+    assistBtn:SetHighlightAtlas("HordeFrame_Title-end")
+    assistBtn:GetHighlightTexture():SetAlpha(0.4)
+    assistBtn:SetFrameLevel(frame:GetFrameLevel() + 2)
+
+    local assistBtnIcon = assistBtn:CreateTexture(nil, "OVERLAY")
+    assistBtnIcon:SetAtlas("housefinder_neighborhood-friends-icon")
+    assistBtnIcon:SetSize(25, 25)
+    assistBtnIcon:SetPoint("CENTER", assistBtn, "CENTER", -8, 3)
+
+    assistBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Party Favorites")
+        GameTooltip:Show()
+    end)
+    assistBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    assistBtn:SetScript("OnClick", function()
+        UI:ZoomPartyFavorites()
+    end)
+    frame.assistBtn = assistBtn
+    assistBtn:Hide()
+
+    return assistBtn
+end
+
+function Favorites:UpdateAssistButton(frame)
+    if not frame or not frame.assistBtn then return end
+    if IsInGroup and IsInGroup() then
+        frame.assistBtn:Show()
+    else
+        frame.assistBtn:Hide()
+    end
 end
 
 function UI:ZoomFavorites()
@@ -152,6 +192,57 @@ function UI:ZoomFavorites()
     end
     frame._hasFilter = true
     frame._zoomedFavorites = true
+    UI:RenderLoot(lines)
+end
+
+function UI:ZoomPartyFavorites()
+    local frame = self.frame
+    if not frame then return end
+
+    local items = Spoilscribe:GetPartyFavoriteItems()
+    if #items == 0 then
+        frame._zoomedPartyFavorites = false
+        Spoilscribe:RefreshLoot()
+        return
+    end
+
+    -- Group by sender, then by dungeon.
+    local senderOrder = {}
+    local senderGroups = {}
+    for _, item in ipairs(items) do
+        local sender = item.sender or "Unknown"
+        if not senderGroups[sender] then
+            senderGroups[sender] = {}
+            senderOrder[#senderOrder + 1] = sender
+        end
+        senderGroups[sender][#senderGroups[sender] + 1] = item
+    end
+
+    local lines = {}
+    for _, sender in ipairs(senderOrder) do
+        local senderItems = senderGroups[sender]
+        -- Sub-group by dungeon.
+        local dungeonOrder = {}
+        local dungeonGroups = {}
+        for _, item in ipairs(senderItems) do
+            local dn = item.dungeonName or "Unknown"
+            if not dungeonGroups[dn] then
+                dungeonGroups[dn] = {}
+                dungeonOrder[#dungeonOrder + 1] = dn
+            end
+            dungeonGroups[dn][#dungeonGroups[dn] + 1] = item
+        end
+        local shortName = sender:match("^([^-]+)") or sender
+        lines[#lines + 1] = { type = "header", text = shortName .. "'s Favorites" }
+        for _, dn in ipairs(dungeonOrder) do
+            lines[#lines + 1] = { type = "header", text = dn }
+            for _, item in ipairs(dungeonGroups[dn]) do
+                lines[#lines + 1] = item
+            end
+        end
+    end
+    frame._hasFilter = true
+    frame._zoomedPartyFavorites = true
     UI:RenderLoot(lines)
 end
 
