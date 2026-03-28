@@ -698,7 +698,7 @@ function Spoilscribe:Open()
     self.UI:ToggleMainFrame()
 end
 
--- Returns a set of dungeon names for which the player has at least one favorite.
+-- Returns a table of dungeon names mapped to favorite item counts.
 function Spoilscribe:GetFavoriteDungeonNames()
     SpoilscribeCharDB.favorites = SpoilscribeCharDB.favorites or {}
     local favIDs = SpoilscribeCharDB.favorites
@@ -709,11 +709,14 @@ function Spoilscribe:GetFavoriteDungeonNames()
     for _, dungeons in pairs(_lootCache) do
         for _, dungeonEntry in ipairs(dungeons) do
             if not result[dungeonEntry.dungeonName] then
+                local count = 0
                 for _, item in ipairs(dungeonEntry.items) do
                     if item.itemID and favIDs[item.itemID] then
-                        result[dungeonEntry.dungeonName] = true
-                        break
+                        count = count + 1
                     end
+                end
+                if count > 0 then
+                    result[dungeonEntry.dungeonName] = count
                 end
             end
         end
@@ -735,14 +738,22 @@ function Spoilscribe:BroadcastFavorites()
     if self.GetOption and not self:GetOption("groupSync") then return end
 
     local dungeons = self:GetFavoriteDungeonNames()
-    local names = {}
-    for dn in pairs(dungeons) do
-        names[#names + 1] = dn
+    local parts = {}
+    for dn, count in pairs(dungeons) do
+        parts[#parts + 1] = dn .. ":" .. tostring(count)
     end
-    -- Send comma-separated dungeon names (empty string = no favorites).
-    local payload = table.concat(names, ",")
+    -- Send "FAV:DungeonName:count,DungeonName:count,..." (empty string = no favorites).
+    local payload = "FAV:" .. table.concat(parts, ",")
     local channel = IsInGroup(LE_PARTY_CATEGORY_INSTANCE) and "INSTANCE_CHAT" or "PARTY"
     C_ChatInfo.SendAddonMessage(COMM_PREFIX, payload, channel)
+end
+
+function Spoilscribe:RequestPartyFavorites()
+    if IsPlayerInInstance() then return end
+    if not IsInGroup or not IsInGroup() then return end
+    if self.GetOption and not self:GetOption("groupSync") then return end
+    local channel = IsInGroup(LE_PARTY_CATEGORY_INSTANCE) and "INSTANCE_CHAT" or "PARTY"
+    C_ChatInfo.SendAddonMessage(COMM_PREFIX, "REQ", channel)
 end
 
 function Spoilscribe:GetPartyFavDungeons()
@@ -758,12 +769,33 @@ local function OnCommReceived(prefix, message, _, sender)
     local myFullName = myName .. "-" .. myRealm
     if sender == myName or sender == myFullName then return end
 
+    -- Handle sync request: another client reloaded and wants our favorites.
+    if message == "REQ" then
+        Spoilscribe:BroadcastFavorites()
+        return
+    end
+
+    -- Strip the "FAV:" prefix (backwards-compat: accept messages without it too).
+    local body = message
+    if body and body:sub(1, 4) == "FAV:" then
+        body = body:sub(5)
+    end
+
     local dungeons = {}
-    if message and message ~= "" then
-        for dn in message:gmatch("[^,]+") do
-            local trimmed = dn:match("^%s*(.-)%s*$")
-            if trimmed and trimmed ~= "" then
-                dungeons[trimmed] = true
+    if body and body ~= "" then
+        for entry in body:gmatch("[^,]+") do
+            local dn, countStr = entry:match("^(.+):(%d+)$")
+            if dn then
+                local trimmed = dn:match("^%s*(.-)%s*$")
+                if trimmed and trimmed ~= "" then
+                    dungeons[trimmed] = tonumber(countStr) or 1
+                end
+            else
+                -- Backwards compat: no count means 1.
+                local trimmed = entry:match("^%s*(.-)%s*$")
+                if trimmed and trimmed ~= "" then
+                    dungeons[trimmed] = 1
+                end
             end
         end
     end
@@ -815,8 +847,9 @@ f:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
         if not ok then
             LogToConsole("Initial loot scan failed: " .. tostring(err))
         end
-        -- Broadcast favorites now that data is ready.
+        -- Broadcast favorites and request party members' favorites.
         Spoilscribe:BroadcastFavorites()
+        Spoilscribe:RequestPartyFavorites()
         f:UnregisterEvent("PLAYER_ENTERING_WORLD")
         return
     end

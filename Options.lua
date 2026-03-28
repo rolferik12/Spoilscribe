@@ -9,12 +9,14 @@ local defaults = {
 }
 
 local function GetOption(key)
+    SpoilscribeCharDB.options = SpoilscribeCharDB.options or {}
     local v = SpoilscribeCharDB.options[key]
     if v == nil then return defaults[key] end
     return v
 end
 
 local function SetOption(key, value)
+    SpoilscribeCharDB.options = SpoilscribeCharDB.options or {}
     SpoilscribeCharDB.options[key] = value
 end
 

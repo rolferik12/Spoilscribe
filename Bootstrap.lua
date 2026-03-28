@@ -113,7 +113,68 @@ end
 
 SLASH_SPOILSCRIBE1 = "/spoilscribe"
 SLASH_SPOILSCRIBE2 = "/ss"
-SlashCmdList.SPOILSCRIBE = OpenFromSlash
+SlashCmdList.SPOILSCRIBE = function(msg)
+    msg = (msg or ""):lower():match("^%s*(.-)%s*$")
+    if msg == "simparty" then
+        Spoilscribe._simParty = not Spoilscribe._simParty
+        if Spoilscribe._simParty then
+            -- Inject fake party members with favorites spread across dungeons.
+            local dungeons = Spoilscribe.Data and Spoilscribe.Data.Dungeons or {}
+            local partyData = Spoilscribe:GetPartyFavDungeons()
+            partyData["Thrallina-Stormrage"] = {}
+            partyData["Jainapriest-Illidan"] = {}
+            partyData["Grommlock-Tichondrius"] = {}
+            for i, d in ipairs(dungeons) do
+                if i % 2 == 1 then partyData["Thrallina-Stormrage"][d.name] = math.random(1, 5) end
+                if i % 3 == 0 then partyData["Jainapriest-Illidan"][d.name] = math.random(1, 3) end
+                if i <= 3 then partyData["Grommlock-Tichondrius"][d.name] = math.random(2, 6) end
+            end
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spoilscribe]|r Simulated party ON (3 fake members).")
+        else
+            local partyData = Spoilscribe:GetPartyFavDungeons()
+            partyData["Thrallina-Stormrage"] = nil
+            partyData["Jainapriest-Illidan"] = nil
+            partyData["Grommlock-Tichondrius"] = nil
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spoilscribe]|r Simulated party OFF.")
+        end
+        if Spoilscribe.UI and Spoilscribe.UI.frame and Spoilscribe.UI.frame:IsShown() then
+            Spoilscribe.UI:RenderPage()
+        end
+        return
+    end
+    if msg == "debugcomm" then
+        local ok, err = pcall(function()
+            local log = function(m) DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SS Comm]|r " .. m) end
+            local syncOn = Spoilscribe.GetOption and Spoilscribe:GetOption("groupSync")
+            log("groupSync: " .. tostring(syncOn))
+            log("InGroup: " .. tostring(IsInGroup and IsInGroup()))
+            local inInst, instType = _G.IsInInstance()
+            log("Instance type: " .. tostring(instType))
+            -- What we would broadcast.
+            local myDungeons = Spoilscribe:GetFavoriteDungeonNames()
+            local myList = {}
+            for dn in pairs(myDungeons) do myList[#myList + 1] = dn end
+            log("My fav dungeons (" .. #myList .. "): " .. (next(myList) and table.concat(myList, ", ") or "none"))
+            -- What we've received from others.
+            local partyData = Spoilscribe:GetPartyFavDungeons()
+            local count = 0
+            for sender, dungeons in pairs(partyData) do
+                count = count + 1
+                local names = {}
+                for dn in pairs(dungeons) do names[#names + 1] = dn end
+                log("  " .. sender .. ": " .. table.concat(names, ", "))
+            end
+            if count == 0 then
+                log("  No party member data received.")
+            end
+        end)
+        if not ok then
+            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SS Comm Error]|r " .. tostring(err))
+        end
+        return
+    end
+    OpenFromSlash()
+end
 
 SLASH_SSCLEARCACHE1 = "/ss_clearcache"
 SlashCmdList.SSCLEARCACHE = function()

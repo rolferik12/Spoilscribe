@@ -873,14 +873,34 @@ function UI:RenderPage()
                 end)
                 row.favBtn:Hide()
 
-                -- Party friend icons (up to 4 for party members with favorites in this dungeon).
+                -- Party member icons (up to 4 for party members with favorites in this dungeon).
                 row.partyIcons = {}
                 for pi = 1, 4 do
-                    local pIcon = row:CreateTexture(nil, "OVERLAY")
-                    pIcon:SetAtlas("housefinder_neighborhood-list-friend-icon")
-                    pIcon:SetSize(16, 16)
-                    pIcon:Hide()
-                    row.partyIcons[pi] = pIcon
+                    local pFrame = CreateFrame("Frame", nil, row)
+                    pFrame:SetSize(22, 22)
+                    pFrame:Hide()
+                    local pIcon = pFrame:CreateTexture(nil, "ARTWORK")
+                    pIcon:SetAtlas("PartySizeIcon")
+                    pIcon:SetAllPoints(pFrame)
+                    pIcon:SetDesaturated(true)
+                    pIcon:SetVertexColor(100/255, 210/255, 255/255)
+                    pFrame._icon = pIcon
+                    local pCount = pFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                    pCount:SetPoint("TOPRIGHT", pFrame, "TOPRIGHT", -1, -2)
+                    pCount:SetTextColor(1, 1, 1)
+                    pFrame._count = pCount
+                    pFrame:EnableMouse(true)
+                    pFrame:SetScript("OnEnter", function(self)
+                        if self._senderName then
+                            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                            GameTooltip:SetText(self._senderName)
+                            GameTooltip:Show()
+                        end
+                    end)
+                    pFrame:SetScript("OnLeave", function()
+                        GameTooltip:Hide()
+                    end)
+                    row.partyIcons[pi] = pFrame
                 end
 
                 frame.rows[rowIndex] = row
@@ -1013,19 +1033,22 @@ function UI:RenderPage()
                     row.headerText:SetTextColor(75/255, 50/255, 20/255)
                     row.headerText:Show()
                 end
-                -- Show party friend icons for members with favorites in this dungeon.
+                -- Show party icons for members with favorites in this dungeon.
                 if row.partyIcons then
                     local partyData = Spoilscribe:GetPartyFavDungeons()
                     local dungeonName = line.text or ""
                     local iconIdx = 0
                     for sender, dungeons in pairs(partyData) do
-                        if dungeons[dungeonName] then
+                        local count = dungeons[dungeonName]
+                        if count then
                             iconIdx = iconIdx + 1
                             if iconIdx <= #row.partyIcons then
-                                local pIcon = row.partyIcons[iconIdx]
-                                pIcon:ClearAllPoints()
-                                pIcon:SetPoint("RIGHT", row, "RIGHT", -4 - (iconIdx - 1) * 18, 0)
-                                pIcon:Show()
+                                local pFrame = row.partyIcons[iconIdx]
+                                pFrame:ClearAllPoints()
+                                pFrame:SetPoint("RIGHT", row, "RIGHT", -4 - (iconIdx - 1) * 22, 0)
+                                pFrame._count:SetText(tostring(count))
+                                pFrame._senderName = sender
+                                pFrame:Show()
                             end
                         end
                     end
