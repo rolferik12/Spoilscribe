@@ -16,9 +16,15 @@ f:RegisterEvent("ADDON_LOADED")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:RegisterEvent("CHAT_MSG_ADDON")
 f:RegisterEvent("GROUP_ROSTER_UPDATE")
+f:RegisterEvent("PLAYER_REGEN_ENABLED")
 f:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
     if event == "CHAT_MSG_ADDON" then
         Spoilscribe:HandleCommReceived(arg1, arg2, arg3, arg4)
+        return
+    end
+
+    if event == "PLAYER_REGEN_ENABLED" then
+        Spoilscribe:BroadcastFavorites()
         return
     end
 

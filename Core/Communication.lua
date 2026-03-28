@@ -15,6 +15,7 @@ local function IsPlayerInInstance()
 end
 
 function Spoilscribe:BroadcastFavorites()
+    if InCombatLockdown and InCombatLockdown() then return end
     if IsPlayerInInstance() then return end
     if not IsInGroup or not IsInGroup() then return end
     if self.GetOption and not self:GetOption("groupSync") then return end
