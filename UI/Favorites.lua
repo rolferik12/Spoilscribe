@@ -199,46 +199,93 @@ function UI:ZoomPartyFavorites()
     local frame = self.frame
     if not frame then return end
 
-    local items = Spoilscribe:GetPartyFavoriteItems()
+    local partyItems = Spoilscribe:GetPartyFavoriteItems()
+    local myItems = Spoilscribe:GetFavoriteItems()
+
+    -- Collect all senders per item ID.
+    local myName = UnitName and UnitName("player") or "You"
+    local itemSenders = {}
+    for _, item in ipairs(myItems) do
+        if item.itemID then
+            if not itemSenders[item.itemID] then itemSenders[item.itemID] = {} end
+            itemSenders[item.itemID][myName] = true
+        end
+    end
+    for _, item in ipairs(partyItems) do
+        if item.itemID then
+            if not itemSenders[item.itemID] then itemSenders[item.itemID] = {} end
+            local sender = item.sender or "Unknown"
+            itemSenders[item.itemID][sender] = true
+        end
+    end
+
+    -- Combine own favorites and party favorites, deduplicating by itemID.
+    local seen = {}
+    local items = {}
+    for _, item in ipairs(myItems) do
+        if item.itemID and not seen[item.itemID] then
+            seen[item.itemID] = true
+            item.sender = myName
+            item.senders = itemSenders[item.itemID]
+            items[#items + 1] = item
+        end
+    end
+    for _, item in ipairs(partyItems) do
+        if item.itemID and not seen[item.itemID] then
+            seen[item.itemID] = true
+            item.senders = itemSenders[item.itemID]
+            items[#items + 1] = item
+        end
+    end
+
     if #items == 0 then
         frame._zoomedPartyFavorites = false
         Spoilscribe:RefreshLoot()
         return
     end
 
-    -- Group by sender, then by dungeon.
-    local senderOrder = {}
-    local senderGroups = {}
+    -- Group by dungeon, count items and distinct contributors per dungeon.
+    local dungeonGroups = {}
+    local dungeonCounts = {}
+    local dungeonMembers = {}
     for _, item in ipairs(items) do
-        local sender = item.sender or "Unknown"
-        if not senderGroups[sender] then
-            senderGroups[sender] = {}
-            senderOrder[#senderOrder + 1] = sender
+        local dn = item.dungeonName or "Unknown"
+        if not dungeonGroups[dn] then
+            dungeonGroups[dn] = {}
+            dungeonCounts[dn] = 0
+            dungeonMembers[dn] = {}
         end
-        senderGroups[sender][#senderGroups[sender] + 1] = item
+        dungeonGroups[dn][#dungeonGroups[dn] + 1] = item
+        dungeonCounts[dn] = dungeonCounts[dn] + 1
+        local sender = item.sender or "Unknown"
+        dungeonMembers[dn][sender] = true
     end
 
-    local lines = {}
-    for _, sender in ipairs(senderOrder) do
-        local senderItems = senderGroups[sender]
-        -- Sub-group by dungeon.
-        local dungeonOrder = {}
-        local dungeonGroups = {}
-        for _, item in ipairs(senderItems) do
-            local dn = item.dungeonName or "Unknown"
-            if not dungeonGroups[dn] then
-                dungeonGroups[dn] = {}
-                dungeonOrder[#dungeonOrder + 1] = dn
-            end
-            dungeonGroups[dn][#dungeonGroups[dn] + 1] = item
+    -- Count distinct members per dungeon.
+    local dungeonMemberCounts = {}
+    for dn, members in pairs(dungeonMembers) do
+        local count = 0
+        for _ in pairs(members) do count = count + 1 end
+        dungeonMemberCounts[dn] = count
+    end
+
+    -- Sort: most members first, then most items as tiebreaker.
+    local dungeonOrder = {}
+    for dn in pairs(dungeonGroups) do
+        dungeonOrder[#dungeonOrder + 1] = dn
+    end
+    table.sort(dungeonOrder, function(a, b)
+        if dungeonMemberCounts[a] ~= dungeonMemberCounts[b] then
+            return dungeonMemberCounts[a] > dungeonMemberCounts[b]
         end
-        local shortName = sender:match("^([^-]+)") or sender
-        lines[#lines + 1] = { type = "header", text = shortName .. "'s Favorites" }
-        for _, dn in ipairs(dungeonOrder) do
-            lines[#lines + 1] = { type = "header", text = dn }
-            for _, item in ipairs(dungeonGroups[dn]) do
-                lines[#lines + 1] = item
-            end
+        return dungeonCounts[a] > dungeonCounts[b]
+    end)
+
+    local lines = {}
+    for _, dn in ipairs(dungeonOrder) do
+        lines[#lines + 1] = { type = "header", text = dn }
+        for _, item in ipairs(dungeonGroups[dn]) do
+            lines[#lines + 1] = item
         end
     end
     frame._hasFilter = true

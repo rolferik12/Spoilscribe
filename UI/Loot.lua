@@ -368,6 +368,42 @@ function UI:CreateLootRow(frame)
     end)
     row.favBtn:Hide()
 
+    -- Party favorites stacked stars.
+    row.partyFavBtn = CreateFrame("Frame", nil, row)
+    row.partyFavBtn:SetSize(22, 20)
+    row.partyFavBtn:SetPoint("TOPRIGHT", row, "TOPRIGHT", 3, -3)
+    row.partyFavBtn:EnableMouse(true)
+    row.partyFavBtn._stars = {}
+    local MAX_STARS = 5
+    for si = 1, MAX_STARS do
+        local star = row.partyFavBtn:CreateTexture(nil, "OVERLAY")
+        star:SetAtlas("PetJournal-FavoritesIcon")
+        star:SetDesaturated(true)
+        star:SetVertexColor(0.4, 0.9, 0.9)
+        star:SetSize(22, 20)
+        star:SetPoint("TOP", row.partyFavBtn, "TOP", 0, (si - 1) * -6)
+        star:Hide()
+        row.partyFavBtn._stars[si] = star
+    end
+    row.partyFavBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        local names = self._senderNames
+        if names and #names > 0 then
+            GameTooltip:SetText("Favorited by:")
+            for _, name in ipairs(names) do
+                GameTooltip:AddLine(name, 1, 1, 1)
+            end
+        else
+            GameTooltip:SetText("Party Favorite")
+        end
+        GameTooltip:Show()
+    end)
+    row.partyFavBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    row.partyFavBtn._senderNames = {}
+    row.partyFavBtn:Hide()
+
     -- Party member icons.
     row.partyIcons = {}
     for pi = 1, 4 do
@@ -412,7 +448,14 @@ function UI:ResetRow(row)
     if row.headerBg then row.headerBg:Hide() end
     if row.headerText then row.headerText:SetText(""); row.headerText:Hide() end
     if row.favBtn then row.favBtn:Hide() end
+    if row.partyFavBtn then
+        row.partyFavBtn:Hide()
+        if row.partyFavBtn._stars then
+            for _, star in ipairs(row.partyFavBtn._stars) do star:Hide() end
+        end
+    end
     if row.bg then row.bg:Hide() end
+    row._senders = nil
     if row.partyIcons then
         for _, pIcon in ipairs(row.partyIcons) do pIcon:Hide() end
     end
@@ -431,6 +474,7 @@ function UI:PopulateRow(row, line, frame, ICON_SIZE, ITEM_ROW_HEIGHT, TEXT_ROW_H
         text = line.itemLink or line.itemName or ("Item " .. tostring(line.itemID))
         row.itemID = line.itemID
         row.itemLink = line.itemLink
+        row._senders = line.senders
         if line.icon then
             showIcon = true
             iconTexture = line.icon
@@ -439,6 +483,7 @@ function UI:PopulateRow(row, line, frame, ICON_SIZE, ITEM_ROW_HEIGHT, TEXT_ROW_H
         text = line.text or ""
         row.itemID = line.itemID
         row.itemLink = line.itemLink
+        row._senders = line.senders
     else
         text = tostring(line)
     end
@@ -549,8 +594,37 @@ function UI:PopulateRow(row, line, frame, ICON_SIZE, ITEM_ROW_HEIGHT, TEXT_ROW_H
     row:EnableMouse(row.itemID ~= nil or (row.itemLink ~= nil and row.itemLink ~= ""))
 
     -- Favorite button state.
-    if row.favBtn then
-        if row.itemID then
+    if row.favBtn and row.partyFavBtn then
+        if row.itemID and frame._zoomedPartyFavorites then
+            -- In party favorites view, show stacked stars instead of favorite button.
+            row.favBtn:Hide()
+            local senders = row._senders
+            local names = {}
+            if senders then
+                for name in pairs(senders) do
+                    local short = name:match("^([^-]+)") or name
+                    names[#names + 1] = short
+                end
+                table.sort(names)
+            end
+            row.partyFavBtn._senderNames = names
+            -- Show one star per sender, up to the max.
+            local starCount = #names
+            if row.partyFavBtn._stars then
+                for si = 1, #row.partyFavBtn._stars do
+                    if si <= starCount then
+                        row.partyFavBtn._stars[si]:Show()
+                    else
+                        row.partyFavBtn._stars[si]:Hide()
+                    end
+                end
+            end
+            -- Resize container to fit stacked stars.
+            local h = 20 + math.max(0, starCount - 1) * 6
+            row.partyFavBtn:SetHeight(h)
+            row.partyFavBtn:Show()
+        elseif row.itemID then
+            row.partyFavBtn:Hide()
             SpoilscribeCharDB.favorites = SpoilscribeCharDB.favorites or {}
             if SpoilscribeCharDB.favorites[row.itemID] then
                 row.favBtn:GetNormalTexture():SetDesaturated(false)
@@ -562,6 +636,7 @@ function UI:PopulateRow(row, line, frame, ICON_SIZE, ITEM_ROW_HEIGHT, TEXT_ROW_H
             row.favBtn:Show()
         else
             row.favBtn:Hide()
+            row.partyFavBtn:Hide()
         end
     end
 
