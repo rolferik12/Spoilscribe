@@ -138,14 +138,20 @@ function Favorites:CreateAssistButton(frame, zoomBtn)
     assistBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText("Party Favorites")
+        if self._disabled then
+            GameTooltip:AddLine("Disabled in instances", 0.5, 0.5, 0.5)
+        end
         GameTooltip:Show()
     end)
     assistBtn:SetScript("OnLeave", function()
         GameTooltip:Hide()
     end)
-    assistBtn:SetScript("OnClick", function()
+    assistBtn:SetScript("OnClick", function(self)
+        if self._disabled then return end
         UI:ZoomPartyFavorites()
     end)
+    assistBtn._icon = assistBtnIcon
+    assistBtn._disabled = false
     frame.assistBtn = assistBtn
     assistBtn:Hide()
 
@@ -154,10 +160,28 @@ end
 
 function Favorites:UpdateAssistButton(frame)
     if not frame or not frame.assistBtn then return end
-    if IsInGroup and IsInGroup() then
-        frame.assistBtn:Show()
-    else
+    if not IsInGroup or not IsInGroup() then
         frame.assistBtn:Hide()
+        return
+    end
+    frame.assistBtn:Show()
+    local inInstance = false
+    if IsInInstance then
+        local _, instanceType = IsInInstance()
+        inInstance = instanceType and instanceType ~= "none"
+    end
+    if inInstance then
+        frame.assistBtn._disabled = true
+        if frame.assistBtn._icon then
+            frame.assistBtn._icon:SetDesaturated(true)
+            frame.assistBtn._icon:SetAlpha(0.4)
+        end
+    else
+        frame.assistBtn._disabled = false
+        if frame.assistBtn._icon then
+            frame.assistBtn._icon:SetDesaturated(false)
+            frame.assistBtn._icon:SetAlpha(1)
+        end
     end
 end
 
@@ -192,6 +216,7 @@ function UI:ZoomFavorites()
     end
     frame._hasFilter = true
     frame._zoomedFavorites = true
+    frame._zoomedPartyFavorites = false
     UI:RenderLoot(lines)
 end
 
@@ -244,7 +269,7 @@ function UI:ZoomPartyFavorites()
         return
     end
 
-    -- Group by dungeon, count items and distinct contributors per dungeon.
+    -- Group by dungeon, count weighted favorites and distinct contributors per dungeon.
     local dungeonGroups = {}
     local dungeonCounts = {}
     local dungeonMembers = {}
@@ -256,9 +281,22 @@ function UI:ZoomPartyFavorites()
             dungeonMembers[dn] = {}
         end
         dungeonGroups[dn][#dungeonGroups[dn] + 1] = item
-        dungeonCounts[dn] = dungeonCounts[dn] + 1
-        local sender = item.sender or "Unknown"
-        dungeonMembers[dn][sender] = true
+        -- Count how many people favorited this item (not just 1 per unique item).
+        local senderCount = 0
+        if item.senders then
+            for _ in pairs(item.senders) do senderCount = senderCount + 1 end
+        else
+            senderCount = 1
+        end
+        dungeonCounts[dn] = dungeonCounts[dn] + senderCount
+        if item.senders then
+            for sender in pairs(item.senders) do
+                dungeonMembers[dn][sender] = true
+            end
+        else
+            local sender = item.sender or "Unknown"
+            dungeonMembers[dn][sender] = true
+        end
     end
 
     -- Count distinct members per dungeon.
@@ -290,6 +328,7 @@ function UI:ZoomPartyFavorites()
     end
     frame._hasFilter = true
     frame._zoomedPartyFavorites = true
+    frame._zoomedFavorites = false
     UI:RenderLoot(lines)
 end
 
