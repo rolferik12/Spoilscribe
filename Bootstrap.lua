@@ -3,58 +3,87 @@ local addonName, Spoilscribe = ...
 Spoilscribe = Spoilscribe or {}
 _G[addonName] = Spoilscribe
 
-local function DebugLinks()
+---------------------------------------------------------------------------
+-- Helpers
+---------------------------------------------------------------------------
+
+local function MakeLogger(prefix)
+    return function(msg)
+        DEFAULT_CHAT_FRAME:AddMessage(prefix .. tostring(msg))
+    end
+end
+
+local function SafeCall(fn, errorPrefix)
+    local ok, err = pcall(fn)
+    if not ok and DEFAULT_CHAT_FRAME then
+        DEFAULT_CHAT_FRAME:AddMessage(errorPrefix .. ": " .. tostring(err))
+    end
+end
+
+local function EnsureEJLoaded()
+    if EncounterJournal_LoadUI then pcall(EncounterJournal_LoadUI) end
+end
+
+local function SelectLatestTier()
+    if EJ_GetNumTiers and EJ_GetNumTiers() > 0 then
+        EJ_SelectTier(EJ_GetNumTiers())
+    end
+end
+
+local function GetFirstDungeon()
     local data = Spoilscribe.Data
-    if not data or not data.Dungeons then
+    if not data or not data.Dungeons or not data.Dungeons[1] then return nil end
+    local dungeon = data.Dungeons[1]
+    return dungeon, dungeon.encounters[1]
+end
+
+---------------------------------------------------------------------------
+-- Debug: test item link generation at various M+ key levels
+---------------------------------------------------------------------------
+local function DebugLinks()
+    local dungeon, encounterID = GetFirstDungeon()
+    if not dungeon then
         DEFAULT_CHAT_FRAME:AddMessage("Spoilscribe debug: Data not loaded.")
         return
     end
 
-    local function log(msg)
-        DEFAULT_CHAT_FRAME:AddMessage("[SS] " .. tostring(msg))
-    end
+    local log = MakeLogger("[SS] ")
+    EnsureEJLoaded()
 
-    if EncounterJournal_LoadUI then EncounterJournal_LoadUI() end
-
-    local initialTier = nil
+    local initialTier
     if EJ_GetNumTiers and EJ_GetNumTiers() > 0 then
         initialTier = EJ_GetNumTiers()
     end
 
-    local dungeon = data.Dungeons[1]
-    local encounterID = dungeon.encounters[1]
     log(string.format("Dungeon: %s (ej=%d) Encounter=%d", dungeon.name, dungeon.ejInstanceID, encounterID))
 
-    -- Check what M+ APIs exist
+    -- Report which M+ APIs exist
     log("--- API availability ---")
-    log("SetPreviewMythicPlusLevel: " .. tostring(C_EncounterJournal and C_EncounterJournal.SetPreviewMythicPlusLevel or "nil"))
-    log("GetPreviewMythicPlusLevel: " .. tostring(C_EncounterJournal and C_EncounterJournal.GetPreviewMythicPlusLevel or "nil"))
-    log("SetPreviewPvpTier: " .. tostring(C_EncounterJournal and C_EncounterJournal.SetPreviewPvpTier or "nil"))
+    for _, name in ipairs({ "SetPreviewMythicPlusLevel", "GetPreviewMythicPlusLevel", "SetPreviewPvpTier" }) do
+        log(name .. ": " .. tostring(C_EncounterJournal and C_EncounterJournal[name] or "nil"))
+    end
 
-    -- Helper to do a full setup and get a link
+    local setLevel = C_EncounterJournal and C_EncounterJournal.SetPreviewMythicPlusLevel
+    local getLevel = C_EncounterJournal and C_EncounterJournal.GetPreviewMythicPlusLevel
+
+    -- Apply difficulty + key level after each EJ selection step (required by the API)
+    local function applyMythicPlus(keyLevel)
+        EJ_SetDifficulty(23)
+        if setLevel then setLevel(keyLevel) end
+    end
+
+    -- Configure EJ for the given key level and return the first loot entry
     local function getLinkForKeyLevel(keyLevel)
         if EJ_SelectTier and initialTier then EJ_SelectTier(initialTier) end
-        EJ_SetDifficulty(23)
-        if C_EncounterJournal and C_EncounterJournal.SetPreviewMythicPlusLevel then
-            C_EncounterJournal.SetPreviewMythicPlusLevel(keyLevel)
-        end
+        applyMythicPlus(keyLevel)
+
         pcall(EJ_SelectInstance, dungeon.ejInstanceID)
-        EJ_SetDifficulty(23)
-        if C_EncounterJournal and C_EncounterJournal.SetPreviewMythicPlusLevel then
-            C_EncounterJournal.SetPreviewMythicPlusLevel(keyLevel)
-        end
+        applyMythicPlus(keyLevel)
+
         pcall(EJ_SelectEncounter, encounterID)
-        EJ_SetDifficulty(23)
-        if C_EncounterJournal and C_EncounterJournal.SetPreviewMythicPlusLevel then
-            C_EncounterJournal.SetPreviewMythicPlusLevel(keyLevel)
-        end
+        applyMythicPlus(keyLevel)
 
-        -- Check what GetPreviewMythicPlusLevel returns
-        local currentLevel = "N/A"
-        if C_EncounterJournal and C_EncounterJournal.GetPreviewMythicPlusLevel then
-            currentLevel = tostring(C_EncounterJournal.GetPreviewMythicPlusLevel())
-        end
-
+        local currentLevel = getLevel and tostring(getLevel()) or "N/A"
         local info = C_EncounterJournal.GetLootInfoByIndex(1)
         if info then
             return info.link, info.itemID, info.name, currentLevel
@@ -62,154 +91,37 @@ local function DebugLinks()
         return nil, nil, nil, currentLevel
     end
 
-    -- Test key level 0 (regular mythic)
-    log("--- Key Level 0 (base mythic) ---")
-    local link0, id0, name0, cur0 = getLinkForKeyLevel(0)
-    log("  GetPreviewMythicPlusLevel=" .. cur0)
-    log("  id=" .. tostring(id0) .. " name=" .. tostring(name0))
-    log("  link=" .. tostring(link0))
+    -- Test several key levels and collect results for comparison
+    local testLevels = { 0, 5, 10 }
+    local results = {}
+    for _, level in ipairs(testLevels) do
+        log(string.format("--- Key Level %d ---", level))
+        local link, id, name, cur = getLinkForKeyLevel(level)
+        log("  GetPreviewMythicPlusLevel=" .. cur)
+        log("  id=" .. tostring(id) .. " name=" .. tostring(name))
+        log("  link=" .. tostring(link))
+        results[level] = link
+    end
 
-    -- Test key level 5
-    log("--- Key Level 5 ---")
-    local link5, id5, name5, cur5 = getLinkForKeyLevel(5)
-    log("  GetPreviewMythicPlusLevel=" .. cur5)
-    log("  id=" .. tostring(id5) .. " name=" .. tostring(name5))
-    log("  link=" .. tostring(link5))
-
-    -- Test key level 10
-    log("--- Key Level 10 ---")
-    local link10, id10, name10, cur10 = getLinkForKeyLevel(10)
-    log("  GetPreviewMythicPlusLevel=" .. cur10)
-    log("  id=" .. tostring(id10) .. " name=" .. tostring(name10))
-    log("  link=" .. tostring(link10))
-
-    -- Compare: are links different?
     log("--- Comparison ---")
-    log("  0 vs 5 same? " .. tostring(link0 == link5))
-    log("  5 vs 10 same? " .. tostring(link5 == link10))
+    log("  0 vs 5 same? " .. tostring(results[0] == results[5]))
+    log("  5 vs 10 same? " .. tostring(results[5] == results[10]))
 end
 
-local function OpenFromSlash(msg)
-    if msg and string.lower(string.trim and string.trim(msg) or msg) == "debug" then
-        local ok, err = pcall(DebugLinks)
-        if not ok and DEFAULT_CHAT_FRAME then
-            DEFAULT_CHAT_FRAME:AddMessage("Spoilscribe debug error: " .. tostring(err))
-        end
-        return
-    end
+---------------------------------------------------------------------------
+-- Debug: dump raw loot info for first encounter
+---------------------------------------------------------------------------
+local function DebugLoot()
+    local log = MakeLogger("|cff00ff00[SS Debug]|r ")
+    EnsureEJLoaded()
 
-    if type(Spoilscribe.Open) == "function" then
-        local ok, err = pcall(Spoilscribe.Open, Spoilscribe, msg)
-        if not ok and DEFAULT_CHAT_FRAME then
-            DEFAULT_CHAT_FRAME:AddMessage("Spoilscribe: command failed - " .. tostring(err))
-        end
-        return
-    end
-
-    if DEFAULT_CHAT_FRAME then
-        DEFAULT_CHAT_FRAME:AddMessage("Spoilscribe: addon not fully loaded. Enable Lua errors with /console scriptErrors 1 and reload.")
-    end
-end
-
-SLASH_SPOILSCRIBE1 = "/spoilscribe"
-SLASH_SPOILSCRIBE2 = "/ss"
-SlashCmdList.SPOILSCRIBE = function(msg)
-    msg = (msg or ""):lower():match("^%s*(.-)%s*$")
-    if msg == "simparty" then
-        Spoilscribe._simParty = not Spoilscribe._simParty
-        if Spoilscribe._simParty then
-            -- Inject fake party members with favorites spread across dungeons.
-            local dungeons = Spoilscribe.Data and Spoilscribe.Data.Dungeons or {}
-            local partyData = Spoilscribe:GetPartyFavDungeons()
-            partyData["Thrallina-Stormrage"] = {}
-            partyData["Jainapriest-Illidan"] = {}
-            partyData["Grommlock-Tichondrius"] = {}
-            for i, d in ipairs(dungeons) do
-                if i % 2 == 1 then partyData["Thrallina-Stormrage"][d.name] = math.random(1, 5) end
-                if i % 3 == 0 then partyData["Jainapriest-Illidan"][d.name] = math.random(1, 3) end
-                if i <= 3 then partyData["Grommlock-Tichondrius"][d.name] = math.random(2, 6) end
-            end
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spoilscribe]|r Simulated party ON (3 fake members).")
-        else
-            local partyData = Spoilscribe:GetPartyFavDungeons()
-            partyData["Thrallina-Stormrage"] = nil
-            partyData["Jainapriest-Illidan"] = nil
-            partyData["Grommlock-Tichondrius"] = nil
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spoilscribe]|r Simulated party OFF.")
-        end
-        if Spoilscribe.UI and Spoilscribe.UI.frame and Spoilscribe.UI.frame:IsShown() then
-            Spoilscribe.UI:RenderPage()
-        end
-        return
-    end
-    if msg == "debugcomm" then
-        local ok, err = pcall(function()
-            local log = function(m) DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SS Comm]|r " .. m) end
-            local syncOn = Spoilscribe.GetOption and Spoilscribe:GetOption("groupSync")
-            log("groupSync: " .. tostring(syncOn))
-            log("InGroup: " .. tostring(IsInGroup and IsInGroup()))
-            local inInst, instType = _G.IsInInstance()
-            log("Instance type: " .. tostring(instType))
-            -- What we would broadcast.
-            local myDungeons = Spoilscribe:GetFavoriteDungeonNames()
-            local myList = {}
-            for dn in pairs(myDungeons) do myList[#myList + 1] = dn end
-            log("My fav dungeons (" .. #myList .. "): " .. (next(myList) and table.concat(myList, ", ") or "none"))
-            -- What we've received from others.
-            local partyData = Spoilscribe:GetPartyFavDungeons()
-            local count = 0
-            for sender, dungeons in pairs(partyData) do
-                count = count + 1
-                local names = {}
-                for dn in pairs(dungeons) do names[#names + 1] = dn end
-                log("  " .. sender .. ": " .. table.concat(names, ", "))
-            end
-            if count == 0 then
-                log("  No party member data received.")
-            end
-        end)
-        if not ok then
-            DEFAULT_CHAT_FRAME:AddMessage("|cffff0000[SS Comm Error]|r " .. tostring(err))
-        end
-        return
-    end
-    OpenFromSlash()
-end
-
-SLASH_SSCLEARCACHE1 = "/ss_clearcache"
-SlashCmdList.SSCLEARCACHE = function()
-    local frame = SpoilscribeFrame
-    if frame and frame.rows then
-        for i, row in ipairs(frame.rows) do
-            row:Hide()
-        end
-        wipe(frame.rows)
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spoilscribe]|r Row cache cleared. Reopen to rebuild.")
-    else
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spoilscribe]|r No cached rows found.")
-    end
-end
-
-SLASH_SSDEBOGLOOT1 = "/ss_debugloot"
-SlashCmdList.SSDEBOGLOOT = function()
-    local function log(msg)
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[SS Debug]|r " .. tostring(msg))
-    end
-
-    if EncounterJournal_LoadUI then pcall(EncounterJournal_LoadUI) end
-
-    local data = Spoilscribe.Data
-    if not data or not data.Dungeons or not data.Dungeons[1] then
+    local dungeon, encounterID = GetFirstDungeon()
+    if not dungeon then
         log("No dungeon data.")
         return
     end
 
-    local dungeon = data.Dungeons[1]
-    local encounterID = dungeon.encounters[1]
-
-    if EJ_GetNumTiers and EJ_GetNumTiers() > 0 then
-        EJ_SelectTier(EJ_GetNumTiers())
-    end
+    SelectLatestTier()
     EJ_SetDifficulty(23)
     pcall(EJ_SelectInstance, dungeon.ejInstanceID)
     pcall(EJ_SelectEncounter, encounterID)
@@ -246,4 +158,116 @@ SlashCmdList.SSDEBOGLOOT = function()
         log("  4=" .. tostring(d) .. " 5=" .. tostring(e) .. " 6=" .. tostring(f))
         log("  7=" .. tostring(g) .. " 8=" .. tostring(h) .. " 9=" .. tostring(i) .. " 10=" .. tostring(j))
     end
+end
+
+---------------------------------------------------------------------------
+-- Debug: dump comm/party sync state
+---------------------------------------------------------------------------
+local function DebugComm()
+    local log = MakeLogger("|cff00ff00[SS Comm]|r ")
+    local syncOn = Spoilscribe.GetOption and Spoilscribe:GetOption("groupSync")
+    log("groupSync: " .. tostring(syncOn))
+    log("InGroup: " .. tostring(IsInGroup and IsInGroup()))
+    local _, instType = _G.IsInInstance()
+    log("Instance type: " .. tostring(instType))
+
+    local myDungeons = Spoilscribe:GetFavoriteDungeonNames()
+    local myList = {}
+    for dn in pairs(myDungeons) do myList[#myList + 1] = dn end
+    log("My fav dungeons (" .. #myList .. "): " .. (next(myList) and table.concat(myList, ", ") or "none"))
+
+    local partyData = Spoilscribe:GetPartyFavDungeons()
+    local count = 0
+    for sender, dungeons in pairs(partyData) do
+        count = count + 1
+        local names = {}
+        for dn in pairs(dungeons) do names[#names + 1] = dn end
+        log("  " .. sender .. ": " .. table.concat(names, ", "))
+    end
+    if count == 0 then
+        log("  No party member data received.")
+    end
+end
+
+---------------------------------------------------------------------------
+-- Simulated party toggle
+---------------------------------------------------------------------------
+local FAKE_MEMBERS = {
+    "Thrallina-Stormrage",
+    "Jainapriest-Illidan",
+    "Grommlock-Tichondrius",
+}
+
+local function ToggleSimParty()
+    Spoilscribe._simParty = not Spoilscribe._simParty
+    local partyData = Spoilscribe:GetPartyFavDungeons()
+
+    if Spoilscribe._simParty then
+        local dungeons = Spoilscribe.Data and Spoilscribe.Data.Dungeons or {}
+        for _, name in ipairs(FAKE_MEMBERS) do partyData[name] = {} end
+        for i, d in ipairs(dungeons) do
+            if i % 2 == 1 then partyData[FAKE_MEMBERS[1]][d.name] = math.random(1, 5) end
+            if i % 3 == 0 then partyData[FAKE_MEMBERS[2]][d.name] = math.random(1, 3) end
+            if i <= 3   then partyData[FAKE_MEMBERS[3]][d.name] = math.random(2, 6) end
+        end
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spoilscribe]|r Simulated party ON (3 fake members).")
+    else
+        for _, name in ipairs(FAKE_MEMBERS) do partyData[name] = nil end
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spoilscribe]|r Simulated party OFF.")
+    end
+
+    if Spoilscribe.UI and Spoilscribe.UI.frame and Spoilscribe.UI.frame:IsShown() then
+        Spoilscribe.UI:RenderPage()
+    end
+end
+
+---------------------------------------------------------------------------
+-- Slash command dispatch
+---------------------------------------------------------------------------
+
+local SubCommands = {
+    debug     = function() SafeCall(DebugLinks, "Spoilscribe debug error") end,
+    debugcomm = function() SafeCall(DebugComm, "|cffff0000[SS Comm Error]|r") end,
+    simparty  = ToggleSimParty,
+}
+
+SLASH_SPOILSCRIBE1 = "/spoilscribe"
+SLASH_SPOILSCRIBE2 = "/ss"
+SlashCmdList.SPOILSCRIBE = function(msg)
+    msg = (msg or ""):lower():match("^%s*(.-)%s*$")
+
+    local handler = SubCommands[msg]
+    if handler then
+        handler()
+        return
+    end
+
+    -- Default: open the main UI
+    if type(Spoilscribe.Open) == "function" then
+        SafeCall(function() Spoilscribe:Open(msg) end, "Spoilscribe: command failed")
+    elseif DEFAULT_CHAT_FRAME then
+        DEFAULT_CHAT_FRAME:AddMessage(
+            "Spoilscribe: addon not fully loaded. Enable Lua errors with /console scriptErrors 1 and reload.")
+    end
+end
+
+---------------------------------------------------------------------------
+-- Utility slash commands
+---------------------------------------------------------------------------
+
+SLASH_SSCLEARCACHE1 = "/ss_clearcache"
+SlashCmdList.SSCLEARCACHE = function()
+    local frame = SpoilscribeFrame
+    if frame and frame.rows then
+        for _, row in ipairs(frame.rows) do row:Hide() end
+        wipe(frame.rows)
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spoilscribe]|r Row cache cleared. Reopen to rebuild.")
+    else
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Spoilscribe]|r No cached rows found.")
+    end
+end
+
+SLASH_SSDEBOGLOOT1 = "/ss_debugloot"
+SlashCmdList.SSDEBOGLOOT = function()
+    SafeCall(DebugLoot, "|cffff0000[SS Debug Error]|r")
 end

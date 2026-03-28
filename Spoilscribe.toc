@@ -9,5 +9,9 @@
 Bootstrap.lua
 Data.lua
 Options.lua
+UIWidgets.lua
+UISearch.lua
+UIFavorites.lua
+UILoot.lua
 UI.lua
 Core.lua
