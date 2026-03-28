@@ -877,16 +877,14 @@ function UI:RenderPage()
                 row.partyIcons = {}
                 for pi = 1, 4 do
                     local pFrame = CreateFrame("Frame", nil, row)
-                    pFrame:SetSize(22, 22)
+                    pFrame:SetSize(25, 25)
                     pFrame:Hide()
                     local pIcon = pFrame:CreateTexture(nil, "ARTWORK")
-                    pIcon:SetAtlas("PartySizeIcon")
+                    pIcon:SetAtlas("housefinder_neighborhood-list-friend-icon")
                     pIcon:SetAllPoints(pFrame)
-                    pIcon:SetDesaturated(true)
-                    pIcon:SetVertexColor(100/255, 210/255, 255/255)
                     pFrame._icon = pIcon
                     local pCount = pFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                    pCount:SetPoint("TOPRIGHT", pFrame, "TOPRIGHT", -1, -2)
+                    pCount:SetPoint("TOPRIGHT", pFrame, "TOPRIGHT", 2, 2)
                     pCount:SetTextColor(1, 1, 1)
                     pFrame._count = pCount
                     pFrame:EnableMouse(true)
@@ -1045,7 +1043,7 @@ function UI:RenderPage()
                             if iconIdx <= #row.partyIcons then
                                 local pFrame = row.partyIcons[iconIdx]
                                 pFrame:ClearAllPoints()
-                                pFrame:SetPoint("RIGHT", row, "RIGHT", -4 - (iconIdx - 1) * 22, 0)
+                                pFrame:SetPoint("RIGHT", row, "RIGHT", -4 - (iconIdx - 1) * 24, 0)
                                 pFrame._count:SetText(tostring(count))
                                 pFrame._senderName = sender
                                 pFrame:Show()
