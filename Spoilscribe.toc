@@ -9,5 +9,15 @@
 Bootstrap.lua
 Data.lua
 Options.lua
-UI.lua
-Core.lua
+UI\Widgets.lua
+UI\Search.lua
+UI\Favorites.lua
+UI\Loot.lua
+UI\Main.lua
+Core\Init.lua
+Core\Scanning.lua
+Core\Filtering.lua
+Core\LootBuilder.lua
+Core\Favorites.lua
+Core\Communication.lua
+Core\Events.lua
