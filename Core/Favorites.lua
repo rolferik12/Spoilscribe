@@ -5,27 +5,36 @@ function Spoilscribe:GetFavoriteItems()
     local favIDs = SpoilscribeCharDB.favorites
     if not next(favIDs) then return {} end
 
-    -- Search all cache keys so favorites never change with difficulty/spec selection.
+    -- Use the currently selected difficulty but always resolve across all specs (class-wide).
+    local frame = self.UI and self.UI.frame
+    local diffId = 23
+    if frame then
+        local difficulty = self.Data.Difficulties[frame.selectedDifficultyIndex or 1]
+        diffId = difficulty and difficulty.id or 23
+    end
+
+    local key = self:CacheKey(diffId, 0)
+    local dungeons = self._lootCache[key]
+    if not dungeons then return {} end
+
     local seen = {}
     local results = {}
-    for _, dungeons in pairs(self._lootCache) do
-        for _, dungeonEntry in ipairs(dungeons) do
-            for _, item in ipairs(dungeonEntry.items) do
-                if item.itemID and favIDs[item.itemID] and not seen[item.itemID] then
-                    seen[item.itemID] = true
-                    results[#results + 1] = {
-                        type        = "item",
-                        itemID      = item.itemID,
-                        itemLink    = item.itemLink,
-                        itemName    = item.itemName,
-                        itemQuality = item.itemQuality,
-                        icon        = item.icon,
-                        slot        = item.slot or "",
-                        armorType   = item.armorType or "",
-                        bossName    = item.bossName,
-                        dungeonName = dungeonEntry.dungeonName,
-                    }
-                end
+    for _, dungeonEntry in ipairs(dungeons) do
+        for _, item in ipairs(dungeonEntry.items) do
+            if item.itemID and favIDs[item.itemID] and not seen[item.itemID] then
+                seen[item.itemID] = true
+                results[#results + 1] = {
+                    type        = "item",
+                    itemID      = item.itemID,
+                    itemLink    = item.itemLink,
+                    itemName    = item.itemName,
+                    itemQuality = item.itemQuality,
+                    icon        = item.icon,
+                    slot        = item.slot or "",
+                    armorType   = item.armorType or "",
+                    bossName    = item.bossName,
+                    dungeonName = dungeonEntry.dungeonName,
+                }
             end
         end
     end
