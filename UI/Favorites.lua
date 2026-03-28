@@ -322,7 +322,16 @@ function UI:ZoomPartyFavorites()
     local lines = {}
     for _, dn in ipairs(dungeonOrder) do
         lines[#lines + 1] = { type = "header", text = dn }
-        for _, item in ipairs(dungeonGroups[dn]) do
+        -- Sort items by number of members who favorited them, descending.
+        local dnItems = dungeonGroups[dn]
+        table.sort(dnItems, function(a, b)
+            local aCount = 0
+            if a.senders then for _ in pairs(a.senders) do aCount = aCount + 1 end end
+            local bCount = 0
+            if b.senders then for _ in pairs(b.senders) do bCount = bCount + 1 end end
+            return aCount > bCount
+        end)
+        for _, item in ipairs(dnItems) do
             lines[#lines + 1] = item
         end
     end
