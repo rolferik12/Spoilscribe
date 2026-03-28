@@ -1,7 +1,6 @@
 local addonName, Spoilscribe = ...
 
 Spoilscribe = Spoilscribe or {}
-_G[addonName] = Spoilscribe
 
 SpoilscribeDB = SpoilscribeDB or {}
 SpoilscribeCharDB = SpoilscribeCharDB or {}
