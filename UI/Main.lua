@@ -136,7 +136,8 @@ function UI:CreateMainFrame()
     -- Result area with pagination (from UILoot).
     self:CreateResultArea(frame)
 
-    -- Favorites panel (from UIFavorites).
+    -- Tab buttons and favorites panel (from UIFavorites).
+    UI.Favorites:CreateHomeButton(frame)
     local slideOut = UI.Favorites:CreatePanel(frame)
     local slideBtn = UI.Favorites:CreateToggleButton(frame, slideOut)
     local zoomBtn = UI.Favorites:CreateZoomButton(frame, slideBtn)

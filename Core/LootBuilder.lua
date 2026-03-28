@@ -104,6 +104,11 @@ function Spoilscribe:RefreshLoot()
 
     self.UI:RenderLoot(lines)
 
+    -- Highlight home tab when returning to the main view.
+    if self.UI.frame and self.UI.frame.homeBtn then
+        self.UI.Favorites:HighlightTab(self.UI.frame, self.UI.frame.homeBtn)
+    end
+
     -- Refresh the favorites panel if it's open, since difficulty/spec may have changed.
     if self.UI.frame and self.UI.frame.slideOut and self.UI.frame.slideOut:IsShown() then
         self.UI:RenderFavorites()

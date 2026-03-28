@@ -46,10 +46,72 @@ function Favorites:CreatePanel(frame)
     return slideOut
 end
 
+local function AddSelectedOverlay(btn)
+    local sel = btn:CreateTexture(nil, "OVERLAY")
+    sel:SetAtlas("AftLevelup-GlowLine")
+    sel:SetSize(45, 12)
+    sel:SetPoint("CENTER", btn, "CENTER", -8, -11)
+    sel:Hide()
+    btn._selectedTex = sel
+end
+
+local function HighlightTab(frame, activeBtn)
+    local tabs = { frame.homeBtn, frame.slideBtn, frame.zoomBtn, frame.assistBtn }
+    for _, btn in ipairs(tabs) do
+        if btn and btn._selectedTex then
+            if btn == activeBtn then
+                btn._selectedTex:Show()
+            else
+                btn._selectedTex:Hide()
+            end
+        end
+    end
+    frame._activeTab = activeBtn
+end
+
+function Favorites:HighlightTab(frame, activeBtn)
+    HighlightTab(frame, activeBtn)
+end
+
+function Favorites:CreateHomeButton(frame)
+    local homeBtn = CreateFrame("Button", nil, frame)
+    homeBtn:SetSize(68, 60)
+    homeBtn:SetPoint("RIGHT", frame, "RIGHT", 61, 123)
+    homeBtn:SetNormalAtlas("HordeFrame_Title-end")
+    homeBtn:SetHighlightAtlas("HordeFrame_Title-end")
+    homeBtn:GetHighlightTexture():SetAlpha(0.4)
+    homeBtn:SetFrameLevel(frame:GetFrameLevel() + 2)
+
+    local homeBtnIcon = homeBtn:CreateTexture(nil, "OVERLAY")
+    homeBtnIcon:SetAtlas("housing-map-plot-occupied")
+    homeBtnIcon:SetSize(25, 25)
+    homeBtnIcon:SetPoint("CENTER", homeBtn, "CENTER", -8, 3)
+
+    homeBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Loot Browser")
+        GameTooltip:Show()
+    end)
+    homeBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    homeBtn:SetScript("OnClick", function()
+        frame._zoomedFavorites = false
+        frame._zoomedPartyFavorites = false
+        frame._hasFilter = false
+        Spoilscribe:RefreshLoot()
+        HighlightTab(frame, frame.homeBtn)
+    end)
+    AddSelectedOverlay(homeBtn)
+    frame.homeBtn = homeBtn
+
+    return homeBtn
+end
+
 function Favorites:CreateToggleButton(frame, slideOut)
     local slideBtn = CreateFrame("Button", nil, frame)
     slideBtn:SetSize(68, 60)
-    slideBtn:SetPoint("RIGHT", frame, "RIGHT", 61, 93)
+    slideBtn:SetPoint("TOP", frame.homeBtn, "BOTTOM", 0, 0)
     slideBtn:SetNormalAtlas("HordeFrame_Title-end")
     slideBtn:SetHighlightAtlas("HordeFrame_Title-end")
     slideBtn:GetHighlightTexture():SetAlpha(0.4)
@@ -72,12 +134,16 @@ function Favorites:CreateToggleButton(frame, slideOut)
         if open then
             slideOut:Show()
             UI:RenderFavorites()
+            frame.homeBtn:ClearAllPoints()
+            frame.homeBtn:SetPoint("RIGHT", slideOut, "RIGHT", 61, 123)
             slideBtn:ClearAllPoints()
-            slideBtn:SetPoint("RIGHT", slideOut, "RIGHT", 61, 93)
+            slideBtn:SetPoint("TOP", frame.homeBtn, "BOTTOM", 0, 0)
         else
             slideOut:Hide()
+            frame.homeBtn:ClearAllPoints()
+            frame.homeBtn:SetPoint("RIGHT", frame, "RIGHT", 61, 123)
             slideBtn:ClearAllPoints()
-            slideBtn:SetPoint("RIGHT", frame, "RIGHT", 61, 93)
+            slideBtn:SetPoint("TOP", frame.homeBtn, "BOTTOM", 0, 0)
         end
         SpoilscribeCharDB.favoritesOpen = open and true or false
     end
@@ -86,6 +152,7 @@ function Favorites:CreateToggleButton(frame, slideOut)
     slideBtn:SetScript("OnClick", function()
         SetFavoritesOpen(not slideOut:IsShown())
     end)
+    AddSelectedOverlay(slideBtn)
     frame.slideBtn = slideBtn
 
     return slideBtn
@@ -116,6 +183,7 @@ function Favorites:CreateZoomButton(frame, slideBtn)
     zoomBtn:SetScript("OnClick", function()
         UI:ZoomFavorites()
     end)
+    AddSelectedOverlay(zoomBtn)
     frame.zoomBtn = zoomBtn
 
     return zoomBtn
@@ -152,6 +220,7 @@ function Favorites:CreateAssistButton(frame, zoomBtn)
     end)
     assistBtn._icon = assistBtnIcon
     assistBtn._disabled = false
+    AddSelectedOverlay(assistBtn)
     frame.assistBtn = assistBtn
     assistBtn:Hide()
 
@@ -218,6 +287,7 @@ function UI:ZoomFavorites()
     frame._zoomedFavorites = true
     frame._zoomedPartyFavorites = false
     UI:RenderLoot(lines)
+    HighlightTab(frame, frame.zoomBtn)
 end
 
 function UI:ZoomPartyFavorites()
@@ -339,6 +409,7 @@ function UI:ZoomPartyFavorites()
     frame._zoomedPartyFavorites = true
     frame._zoomedFavorites = false
     UI:RenderLoot(lines)
+    HighlightTab(frame, frame.assistBtn)
 end
 
 function UI:RenderFavorites()
