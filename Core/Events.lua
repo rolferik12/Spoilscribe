@@ -25,12 +25,14 @@ f:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
 
     if event == "PLAYER_REGEN_ENABLED" then
         Spoilscribe:BroadcastFavorites()
+        Spoilscribe:BroadcastKeystone()
         return
     end
 
     if event == "GROUP_ROSTER_UPDATE" then
         Spoilscribe:PrunePartyMembers()
         Spoilscribe:BroadcastFavorites()
+        Spoilscribe:BroadcastKeystone()
         if Spoilscribe.UI and Spoilscribe.UI.Favorites and Spoilscribe.UI.frame then
             Spoilscribe.UI.Favorites:UpdateAssistButton(Spoilscribe.UI.frame)
         end
@@ -45,6 +47,7 @@ f:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
         end
         -- Broadcast favorites and request party members' favorites.
         Spoilscribe:BroadcastFavorites()
+        Spoilscribe:BroadcastKeystone()
         Spoilscribe:RequestPartyFavorites()
         f:UnregisterEvent("PLAYER_ENTERING_WORLD")
         return

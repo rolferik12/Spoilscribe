@@ -12,6 +12,7 @@ Spoilscribe._hadMissingLinks = false
 Spoilscribe._isScanning = false
 Spoilscribe._partyFavDungeons = {}
 Spoilscribe._partyFavItems = {}
+Spoilscribe._partyKeystones = {}
 
 function Spoilscribe:LogToConsole(message)
     if DEFAULT_CHAT_FRAME then

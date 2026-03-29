@@ -46,6 +46,25 @@ function Spoilscribe:BroadcastFavorites()
     C_ChatInfo.SendAddonMessage(COMM_PREFIX, itemPayload, channel)
 end
 
+function Spoilscribe:BroadcastKeystone()
+    if InCombatLockdown and InCombatLockdown() then return end
+    if IsPlayerInInstance() then return end
+    if not IsInGroup or not IsInGroup() then return end
+    if self.GetOption and not self:GetOption("groupSync") then return end
+
+    local mapID = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneChallengeMapID and C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+    local level = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneLevel and C_MythicPlus.GetOwnedKeystoneLevel()
+
+    local dungeonName = ""
+    if mapID and C_ChallengeMode and C_ChallengeMode.GetMapUIInfo then
+        dungeonName = C_ChallengeMode.GetMapUIInfo(mapID) or ""
+    end
+
+    local payload = "KEY:" .. dungeonName .. ":" .. tostring(level or 0)
+    local channel = IsInGroup(LE_PARTY_CATEGORY_INSTANCE) and "INSTANCE_CHAT" or "PARTY"
+    C_ChatInfo.SendAddonMessage(COMM_PREFIX, payload, channel)
+end
+
 function Spoilscribe:RequestPartyFavorites()
     if IsPlayerInInstance() then return end
     if not IsInGroup or not IsInGroup() then return end
@@ -71,6 +90,23 @@ function Spoilscribe:HandleCommReceived(prefix, message, _, sender)
     -- Handle sync request: another client reloaded and wants our favorites.
     if message == "REQ" then
         self:BroadcastFavorites()
+        self:BroadcastKeystone()
+        return
+    end
+
+    -- Handle keystone info: KEY:dungeonName:level
+    if message and message:sub(1, 4) == "KEY:" then
+        local rest = message:sub(5)
+        local dungeonName, levelStr = rest:match("^(.*):(%d+)$")
+        local level = tonumber(levelStr)
+        if dungeonName and dungeonName ~= "" and level and level > 0 then
+            self._partyKeystones[sender] = { dungeonName = dungeonName, level = level }
+        else
+            self._partyKeystones[sender] = nil
+        end
+        if self.UI and self.UI.frame and self.UI.frame:IsShown() then
+            self.UI:RenderPage()
+        end
         return
     end
 
@@ -138,6 +174,34 @@ function Spoilscribe:HandleCommReceived(prefix, message, _, sender)
     end
 end
 
+function Spoilscribe:GetKeystoneHolders(dungeonName)
+    local holders = {}
+
+    -- Check the player's own keystone.
+    local mapID = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneChallengeMapID and C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+    local level = C_MythicPlus and C_MythicPlus.GetOwnedKeystoneLevel and C_MythicPlus.GetOwnedKeystoneLevel()
+    if mapID and level and level > 0 then
+        local myKeystoneName = ""
+        if C_ChallengeMode and C_ChallengeMode.GetMapUIInfo then
+            myKeystoneName = C_ChallengeMode.GetMapUIInfo(mapID) or ""
+        end
+        if myKeystoneName ~= "" and string.lower(myKeystoneName) == string.lower(dungeonName) then
+            local myName = UnitName and UnitName("player") or "You"
+            holders[#holders + 1] = { name = myName, level = level }
+        end
+    end
+
+    -- Check party members' keystones.
+    for sender, data in pairs(self._partyKeystones) do
+        if data.dungeonName and string.lower(data.dungeonName) == string.lower(dungeonName) then
+            local shortName = sender:match("^([^-]+)") or sender
+            holders[#holders + 1] = { name = shortName, level = data.level }
+        end
+    end
+
+    return holders
+end
+
 function Spoilscribe:PrunePartyMembers()
     if IsInGroup and IsInGroup() then
         local validNames = {}
@@ -151,10 +215,12 @@ function Spoilscribe:PrunePartyMembers()
             if not validNames[sender] and not validNames[shortName] then
                 self._partyFavDungeons[sender] = nil
                 self._partyFavItems[sender] = nil
+                self._partyKeystones[sender] = nil
             end
         end
     else
         wipe(self._partyFavDungeons)
         wipe(self._partyFavItems)
+        wipe(self._partyKeystones)
     end
 end

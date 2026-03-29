@@ -432,6 +432,31 @@ function UI:CreateLootRow(frame)
         row.partyIcons[pi] = pFrame
     end
 
+    -- Keystone icon for dungeon headers.
+    local keystoneFrame = CreateFrame("Frame", nil, row)
+    keystoneFrame:SetSize(30, 30)
+    keystoneFrame:Hide()
+    local kIcon = keystoneFrame:CreateTexture(nil, "ARTWORK")
+    kIcon:SetAtlas("unitframeicon-chromietime")
+    kIcon:SetAllPoints(keystoneFrame)
+    keystoneFrame._icon = kIcon
+    keystoneFrame._holders = {}
+    keystoneFrame:EnableMouse(true)
+    keystoneFrame:SetScript("OnEnter", function(self)
+        if self._holders and #self._holders > 0 then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Keystone")
+            for _, holder in ipairs(self._holders) do
+                GameTooltip:AddLine(holder.name .. " (+" .. holder.level .. ")", 1, 1, 1)
+            end
+            GameTooltip:Show()
+        end
+    end)
+    keystoneFrame:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    row.keystoneIcon = keystoneFrame
+
     return row
 end
 
@@ -459,6 +484,7 @@ function UI:ResetRow(row)
     if row.partyIcons then
         for _, pIcon in ipairs(row.partyIcons) do pIcon:Hide() end
     end
+    if row.keystoneIcon then row.keystoneIcon:Hide() end
 end
 
 function UI:PopulateRow(row, line, frame, ICON_SIZE, ITEM_ROW_HEIGHT, TEXT_ROW_HEIGHT, HEADER_ROW_HEIGHT)
@@ -564,18 +590,32 @@ function UI:PopulateRow(row, line, frame, ICON_SIZE, ITEM_ROW_HEIGHT, TEXT_ROW_H
             row.headerText:Show()
         end
         -- Party icons for header rows.
+        local dungeonName = line.text or ""
+        -- Keystone icon shown in party favorites view (anchored to far right).
+        local keystoneShown = false
+        if row.keystoneIcon and frame._zoomedPartyFavorites then
+            local holders = Spoilscribe:GetKeystoneHolders(dungeonName)
+            if #holders > 0 then
+                row.keystoneIcon._holders = holders
+                row.keystoneIcon:ClearAllPoints()
+                row.keystoneIcon:SetPoint("RIGHT", row, "RIGHT", 6, 0)
+                row.keystoneIcon:Show()
+                keystoneShown = true
+            end
+        end
+        -- Party icons stacked to the left of the keystone icon.
+        local partyIconCount = 0
+        local partyBaseOffset = keystoneShown and (-6 + 30) or -6
         if row.partyIcons then
             local partyData = Spoilscribe:GetPartyFavDungeons()
-            local dungeonName = line.text or ""
-            local iconIdx = 0
             for sender, dungeons in pairs(partyData) do
                 local count = dungeons[dungeonName]
                 if count then
-                    iconIdx = iconIdx + 1
-                    if iconIdx <= #row.partyIcons then
-                        local pFrame = row.partyIcons[iconIdx]
+                    partyIconCount = partyIconCount + 1
+                    if partyIconCount <= #row.partyIcons then
+                        local pFrame = row.partyIcons[partyIconCount]
                         pFrame:ClearAllPoints()
-                        pFrame:SetPoint("RIGHT", row, "RIGHT", -4 - (iconIdx - 1) * 24, 0)
+                        pFrame:SetPoint("RIGHT", row, "RIGHT", -partyBaseOffset - (partyIconCount - 1) * 24, 0)
                         pFrame._count:SetText(tostring(count))
                         pFrame._senderName = sender
                         pFrame:Show()
