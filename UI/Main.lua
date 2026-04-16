@@ -61,19 +61,22 @@ function UI:CreateMainFrame()
     local specLabel = Widgets:CreateLabel(controls, L["Loot Spec"])
     specLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", labelOffsets[4], -10)
 
-    local defaultDifficultyIndex = 1
+    local savedDifficultyIndex = SpoilscribeCharDB.options and SpoilscribeCharDB.options.difficultyIndex or 1
     frame.difficultyDropdown = Widgets:BuildDropdown(
         controls,
         dropdownWidth,
         Spoilscribe.Data.Difficulties,
-        defaultDifficultyIndex,
+        savedDifficultyIndex,
         function(index)
             frame.selectedDifficultyIndex = index
+            SpoilscribeCharDB.options = SpoilscribeCharDB.options or {}
+            SpoilscribeCharDB.options.difficultyIndex = index
             Spoilscribe:RefreshLoot()
             Spoilscribe:BroadcastFavorites()
         end
     )
     frame.difficultyDropdown:SetPoint("TOPLEFT", controls, "TOPLEFT", dropdownOffsets[1], -23)
+    frame.selectedDifficultyIndex = savedDifficultyIndex
 
     frame.slotDropdown = Widgets:BuildDropdown(
         controls,

@@ -89,6 +89,8 @@ function UI:CreateResultArea(frame)
         frame.difficultyDropdown.selectedIndex = 1
         UIDropDownMenu_SetSelectedID(frame.difficultyDropdown, 1)
         UIDropDownMenu_SetText(frame.difficultyDropdown, Spoilscribe.Data.Difficulties[1].label)
+        SpoilscribeCharDB.options = SpoilscribeCharDB.options or {}
+        SpoilscribeCharDB.options.difficultyIndex = 1
 
         frame.selectedSlotIndex = 1
         frame.slotDropdown.selectedIndex = 1
@@ -315,6 +317,65 @@ function UI:CreateLootRow(frame)
     row:SetScript("OnEnter", function(self)
         if not (self.itemLink or self.itemID) then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        -- When viewing a M+ key level, take the existing EJ item link and
+        -- inject the track bonus ID so the tooltip shows the scaled ilvl.
+        -- Skip for "Other" category items (e.g. trinkets, off-hands) which use different bonus structures.
+        local rewardInfo = frame._mythicPlusRewardInfo
+        local slotVal = self._slot or ""
+        local isOther = (slotVal == "" or slotVal == "Other")
+        if not isOther and self.itemLink and self.itemLink ~= "" and type(rewardInfo) == "table" and rewardInfo.bonusID then
+            local itemString = self.itemLink:match("item[%-?%d:]+")
+            if itemString then
+                -- Parse the item string fields separated by ':'
+                local fields = {}
+                for field in (itemString .. ":"):gmatch("([^:]*):") do
+                    fields[#fields + 1] = field
+                end
+                -- Field layout (1-indexed):
+                --  1=item, 2=itemID, 3=enchant, 4-7=gems, 8=suffix, 9=unique,
+                -- 10=linkLevel, 11=specID, 12=upgradeType, 13=difficultyID,
+                -- 14=numBonusIDs, 15+=bonusIDs...
+                while #fields < 14 do
+                    fields[#fields + 1] = ""
+                end
+                -- Change difficulty from Mythic (23) to M+ (35).
+                fields[13] = "35"
+                local numBonuses = tonumber(fields[14]) or 0
+                -- Replace the EJ Mythic bonus (3524) with M+ common bonuses
+                -- (13440, 6652, 12699) plus the track-specific bonus ID.
+                -- 3524 = single EJ Mythic bonus; real M+ items use 4 bonuses instead.
+                local newBonuses = {}
+                for bi = 15, 14 + numBonuses do
+                    if fields[bi] ~= "3524" then
+                        newBonuses[#newBonuses + 1] = fields[bi]
+                    end
+                end
+                -- Add the M+ common bonus IDs and track bonus.
+                local mplusBonuses = Spoilscribe.Data.MythicPlusBonusIDs or {}
+                for _, b in ipairs(mplusBonuses) do
+                    newBonuses[#newBonuses + 1] = tostring(b)
+                end
+                newBonuses[#newBonuses + 1] = tostring(rewardInfo.bonusID)
+                -- Rebuild: remove old bonus fields and insert new ones.
+                for _ = 1, numBonuses do
+                    table.remove(fields, 15)
+                end
+                fields[14] = tostring(#newBonuses)
+                for i, b in ipairs(newBonuses) do
+                    table.insert(fields, 14 + i, b)
+                end
+                local modifiedString = table.concat(fields, ":")
+                local ok = pcall(GameTooltip.SetHyperlink, GameTooltip, modifiedString)
+                if ok and GameTooltip:NumLines() and GameTooltip:NumLines() > 0 then
+                    GameTooltip:Show()
+                    return
+                end
+                -- Fallback: reset tooltip.
+                GameTooltip:ClearLines()
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            end
+        end
+        -- Default tooltip path.
         if self.itemLink and self.itemLink ~= "" then
             GameTooltip:SetHyperlink(self.itemLink)
         elseif self.itemID then
@@ -323,6 +384,7 @@ function UI:CreateLootRow(frame)
         GameTooltip:Show()
     end)
     row:SetScript("OnLeave", function()
+        GameTooltip:ClearLines()
         GameTooltip:Hide()
     end)
 
@@ -465,6 +527,7 @@ function UI:ResetRow(row)
     row.text:SetText("")
     row.itemID = nil
     row.itemLink = nil
+    row._slot = nil
     if row.icon then row.icon:Hide() end
     if row.IconBorder then row.IconBorder:Hide() end
     if row.slotText then row.slotText:SetText(""); row.slotText:Hide() end
@@ -501,6 +564,7 @@ function UI:PopulateRow(row, line, frame, ICON_SIZE, ITEM_ROW_HEIGHT, TEXT_ROW_H
         text = line.itemLink or line.itemName or ("Item " .. tostring(line.itemID))
         row.itemID = line.itemID
         row.itemLink = line.itemLink
+        row._slot = line.slot
         row._senders = line.senders
         if line.icon then
             showIcon = true

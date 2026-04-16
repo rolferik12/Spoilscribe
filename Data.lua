@@ -3,10 +3,39 @@ local _, Spoilscribe = ...
 Spoilscribe.Data = {}
 
 -- Retail Encounter Journal difficulty IDs.
+-- Mythic+ entries reuse EJ difficulty 23 (Mythic) with a keyLevel field.
 Spoilscribe.Data.Difficulties = {
-    { label = "Mythic", id = 23 },
-    { label = "Heroic", id = 2 },
     { label = "Normal", id = 1 },
+    { label = "Heroic", id = 2 },
+    { label = "Mythic", id = 23 },
+    { label = "Mythic+ 2",  id = 23, keyLevel = 2 },
+    { label = "Mythic+ 3",  id = 23, keyLevel = 3 },
+    { label = "Mythic+ 4",  id = 23, keyLevel = 4 },
+    { label = "Mythic+ 5",  id = 23, keyLevel = 5 },
+    { label = "Mythic+ 6",  id = 23, keyLevel = 6 },
+    { label = "Mythic+ 7",  id = 23, keyLevel = 7 },
+    { label = "Mythic+ 8",  id = 23, keyLevel = 8 },
+    { label = "Mythic+ 9",  id = 23, keyLevel = 9 },
+    { label = "Mythic+ 10", id = 23, keyLevel = 10 },
+    { label = "Mythic + Voidcore", id = 23, keyLevel = "voidcore" },
+}
+
+-- Midnight Season 1 Mythic+ end-of-dungeon reward data.
+-- Maps key level to item level, upgrade track, and track-specific bonus ID.
+-- Common M+ bonus IDs (13440, 6652, 12699) are shared across all M+ items.
+-- Track bonus IDs: Champion 12785-12790, Hero 12793-12798, Myth 12801-12806.
+Spoilscribe.Data.MythicPlusBonusIDs = { 13440, 6652, 12699 }
+Spoilscribe.Data.MythicPlusRewards = {
+    [2]  = { ilvl = 250, track = "Champion 2/6", bonusID = 12786 },
+    [3]  = { ilvl = 250, track = "Champion 2/6", bonusID = 12786 },
+    [4]  = { ilvl = 253, track = "Champion 3/6", bonusID = 12787 },
+    [5]  = { ilvl = 256, track = "Champion 4/6", bonusID = 12788 },
+    [6]  = { ilvl = 259, track = "Hero 1/6",     bonusID = 12793 },
+    [7]  = { ilvl = 259, track = "Hero 1/6",     bonusID = 12793 },
+    [8]  = { ilvl = 263, track = "Hero 2/6",     bonusID = 12794 },
+    [9]  = { ilvl = 263, track = "Hero 2/6",     bonusID = 12794 },
+    [10] = { ilvl = 266, track = "Hero 3/6",     bonusID = 12795 },
+    ["voidcore"] = { ilvl = 272, track = "Myth 1/6", bonusID = 12801 },
 }
 
 -- Filter option scaffolding. Filtering behavior will be added later.

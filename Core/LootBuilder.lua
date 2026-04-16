@@ -24,7 +24,15 @@ function Spoilscribe:BuildLootLines()
     local searchText = frame.searchText and frame.searchText ~= "" and string.lower(frame.searchText) or nil
 
     local diffId = difficulty and difficulty.id or 23
+    local keyLevel = difficulty and difficulty.keyLevel or nil
     local cachedDungeons = self:ScanLootForDifficultyAndSpec(diffId, selectedSpec.classID, selectedSpec.specID)
+
+    -- Store the key level on the frame so the UI can show M+ reward levels.
+    frame._keyLevel = keyLevel
+    frame._mythicPlusRewardInfo = nil
+    if keyLevel and self.Data.MythicPlusRewards then
+        frame._mythicPlusRewardInfo = self.Data.MythicPlusRewards[keyLevel]
+    end
 
     local lines = {}
 
