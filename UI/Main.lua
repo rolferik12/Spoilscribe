@@ -1,4 +1,5 @@
 local _, Spoilscribe = ...
+local L = Spoilscribe.L
 
 -- UI table is initialized by UIWidgets.lua (loaded first).
 local UI = Spoilscribe.UI
@@ -11,7 +12,7 @@ function UI:CreateMainFrame()
 
     if not Widgets:EnsureDropdownAPILoaded() then
         if DEFAULT_CHAT_FRAME then
-            DEFAULT_CHAT_FRAME:AddMessage("Spoilscribe: Blizzard dropdown UI failed to load.")
+            DEFAULT_CHAT_FRAME:AddMessage(L["Spoilscribe: Blizzard dropdown UI failed to load."])
         end
         return nil
     end
@@ -33,7 +34,7 @@ function UI:CreateMainFrame()
 
     frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     frame.title:SetPoint("LEFT", frame.TitleBg, "LEFT", 8, 0)
-    frame.title:SetText("Spoilscribe - Dungeon Loot")
+    frame.title:SetText(L["Spoilscribe - Dungeon Loot"])
 
     -- Controls bar (dropdowns).
     local controls = CreateFrame("Frame", nil, frame)
@@ -48,16 +49,16 @@ function UI:CreateMainFrame()
     local labelOffsets = { 10, 10 + colWidth, 10 + colWidth * 2, 10 + colWidth * 3 }
     local dropdownOffsets = { -16, -16 + colWidth, -16 + colWidth * 2, -16 + colWidth * 3 }
 
-    local difficultyLabel = Widgets:CreateLabel(controls, "Difficulty")
+    local difficultyLabel = Widgets:CreateLabel(controls, L["Difficulty"])
     difficultyLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", labelOffsets[1], -10)
 
-    local slotLabel = Widgets:CreateLabel(controls, "Slot")
+    local slotLabel = Widgets:CreateLabel(controls, L["Slot"])
     slotLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", labelOffsets[2], -10)
 
-    local statsLabel = Widgets:CreateLabel(controls, "Secondary Stats")
+    local statsLabel = Widgets:CreateLabel(controls, L["Secondary Stats"])
     statsLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", labelOffsets[3], -10)
 
-    local specLabel = Widgets:CreateLabel(controls, "Loot Spec")
+    local specLabel = Widgets:CreateLabel(controls, L["Loot Spec"])
     specLabel:SetPoint("TOPLEFT", controls, "TOPLEFT", labelOffsets[4], -10)
 
     local defaultDifficultyIndex = 1

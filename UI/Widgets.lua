@@ -1,4 +1,5 @@
 local _, Spoilscribe = ...
+local L = Spoilscribe.L
 
 local Widgets = {}
 Spoilscribe.UI = Spoilscribe.UI or {}
@@ -30,7 +31,7 @@ function Widgets:BuildDropdown(parent, width, items, defaultIndex, onChanged)
                 text = item.label or item.name
             end
             if text == nil then
-                text = "Option " .. tostring(index)
+                text = string.format(L["Option %d"], index)
             end
             text = tostring(text)
             info.text = text

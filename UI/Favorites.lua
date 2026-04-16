@@ -1,4 +1,5 @@
 local _, Spoilscribe = ...
+local L = Spoilscribe.L
 
 local UI = Spoilscribe.UI
 local Favorites = {}
@@ -89,7 +90,7 @@ function Favorites:CreateHomeButton(frame)
 
     homeBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Loot Browser")
+        GameTooltip:SetText(L["Loot Browser"])
         GameTooltip:Show()
     end)
     homeBtn:SetScript("OnLeave", function()
@@ -123,7 +124,7 @@ function Favorites:CreateToggleButton(frame, slideOut)
     slideBtnIcon:SetPoint("CENTER", slideBtn, "CENTER", -8, 3)
     slideBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(slideOut:IsShown() and "Close Favorites" or "View Favorites")
+        GameTooltip:SetText(slideOut:IsShown() and L["Close Favorites"] or L["View Favorites"])
         GameTooltip:Show()
     end)
     slideBtn:SetScript("OnLeave", function()
@@ -174,7 +175,7 @@ function Favorites:CreateZoomButton(frame, slideBtn)
 
     zoomBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Zoom Favorites")
+        GameTooltip:SetText(L["Zoom Favorites"])
         GameTooltip:Show()
     end)
     zoomBtn:SetScript("OnLeave", function()
@@ -205,9 +206,9 @@ function Favorites:CreateAssistButton(frame, zoomBtn)
 
     assistBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Party Favorites")
+        GameTooltip:SetText(L["Party Favorites"])
         if self._disabled then
-            GameTooltip:AddLine("Disabled in instances", 0.5, 0.5, 0.5)
+            GameTooltip:AddLine(L["Disabled in instances"], 0.5, 0.5, 0.5)
         end
         GameTooltip:Show()
     end)
@@ -461,7 +462,7 @@ function UI:RenderFavorites()
     local slotOrder = {}
     local slotGroups = {}
     for _, item in ipairs(remainingItems) do
-        local slot = (item.slot and item.slot ~= "") and item.slot or "Other"
+        local slot = (item.slot and item.slot ~= "") and item.slot or L["Other"]
         if not slotGroups[slot] then
             slotGroups[slot] = {}
             slotOrder[#slotOrder + 1] = slot
@@ -641,7 +642,7 @@ function UI:RenderFavorites()
     end
 
     if #currentDungeonItems > 0 then
-        RenderHeader("Current Dungeon")
+        RenderHeader(L["Current Dungeon"])
         for _, item in ipairs(currentDungeonItems) do
             RenderItemRow(item)
         end

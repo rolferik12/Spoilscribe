@@ -1,4 +1,5 @@
 local _, Spoilscribe = ...
+local L = Spoilscribe.L
 
 local UI = Spoilscribe.UI
 
@@ -73,7 +74,7 @@ function UI:CreateResultArea(frame)
     clearFilterBtn:Hide()
     clearFilterBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:SetText("Clear Filter")
+        GameTooltip:SetText(L["Clear Filter"])
         GameTooltip:Show()
     end)
     clearFilterBtn:SetScript("OnLeave", function()
@@ -247,7 +248,7 @@ function UI:RenderPage()
     end
 
     -- Update page controls.
-    frame.pageText:SetText("Page " .. frame.currentPage .. " / " .. frame.totalPages)
+    frame.pageText:SetText(string.format(L["Page %d / %d"], frame.currentPage, frame.totalPages))
     frame.prevButton:SetEnabled(frame.currentPage > 1)
     frame.nextButton:SetEnabled(frame.currentPage < frame.totalPages)
 end
@@ -334,7 +335,7 @@ function UI:CreateLootRow(frame)
     row.favBtn:GetNormalTexture():SetAlpha(0.3)
     row.favBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Favorite")
+        GameTooltip:SetText(L["Favorite"])
         GameTooltip:Show()
     end)
     row.favBtn:SetScript("OnLeave", function()
@@ -389,12 +390,12 @@ function UI:CreateLootRow(frame)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         local names = self._senderNames
         if names and #names > 0 then
-            GameTooltip:SetText("Favorited by:")
+            GameTooltip:SetText(L["Favorited by:"])
             for _, name in ipairs(names) do
                 GameTooltip:AddLine(name, 1, 1, 1)
             end
         else
-            GameTooltip:SetText("Party Favorite")
+            GameTooltip:SetText(L["Party Favorite"])
         end
         GameTooltip:Show()
     end)
@@ -445,7 +446,7 @@ function UI:CreateLootRow(frame)
     keystoneFrame:SetScript("OnEnter", function(self)
         if self._holders and #self._holders > 0 then
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText("Keystone")
+            GameTooltip:SetText(L["Keystone"])
             for _, holder in ipairs(self._holders) do
                 GameTooltip:AddLine(holder.name .. " (+" .. holder.level .. ")", 1, 1, 1)
             end
@@ -564,7 +565,7 @@ function UI:PopulateRow(row, line, frame, ICON_SIZE, ITEM_ROW_HEIGHT, TEXT_ROW_H
     -- Boss name label.
     local bossLabel = ""
     if type(line) == "table" and line.type == "item" and line.bossName and line.bossName ~= "" then
-        bossLabel = "Boss: " .. line.bossName
+        bossLabel = string.format(L["Boss: %s"], line.bossName)
     end
     if row.bossText then
         row.bossText:SetText(bossLabel)

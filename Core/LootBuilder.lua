@@ -1,19 +1,20 @@
 local _, Spoilscribe = ...
+local L = Spoilscribe.L
 
 function Spoilscribe:BuildLootLines()
     local frame = self.UI and self.UI.frame
     if not frame then
-        return { "Spoilscribe UI is not ready." }
+        return { L["Spoilscribe UI is not ready."] }
     end
 
     local difficulty = self.Data.Difficulties[frame.selectedDifficultyIndex or 1]
     local selectedSlotLabel = "Any Slot"
     if self.Data and self.Data.Filters and self.Data.Filters.slots then
-        selectedSlotLabel = self.Data.Filters.slots[frame.selectedSlotIndex or 1] or "Any Slot"
+        selectedSlotLabel = self.Data.Filters.slots[frame.selectedSlotIndex or 1] or L["Any Slot"]
     end
     local selectedSecondaryLabel = "Any Stats"
     if self.Data and self.Data.Filters and self.Data.Filters.secondaryStats then
-        selectedSecondaryLabel = self.Data.Filters.secondaryStats[frame.selectedSecondaryIndex or 1] or "Any Stats"
+        selectedSecondaryLabel = self.Data.Filters.secondaryStats[frame.selectedSecondaryIndex or 1] or L["Any Stats"]
     end
 
     local specs = self:GetSpecList()
@@ -28,7 +29,7 @@ function Spoilscribe:BuildLootLines()
     local lines = {}
 
     if not cachedDungeons or #cachedDungeons == 0 then
-        lines[#lines + 1] = "No configured dungeons are currently available in Encounter Journal for this client/tier."
+        lines[#lines + 1] = L["No configured dungeons are currently available in Encounter Journal for this client/tier."]
         return lines
     end
 
@@ -92,9 +93,9 @@ function Spoilscribe:RefreshLoot()
     if not ok then
         local errorText = tostring(lines)
         lines = {
-            "Spoilscribe failed to load loot.",
-            "Error: " .. errorText,
-            "Tip: /reload and open the addon again.",
+            L["Spoilscribe failed to load loot."],
+            string.format(L["Error: %s"], errorText),
+            L["Tip: /reload and open the addon again."],
         }
 
         if DEFAULT_CHAT_FRAME then

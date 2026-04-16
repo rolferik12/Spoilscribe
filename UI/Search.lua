@@ -1,4 +1,5 @@
 local _, Spoilscribe = ...
+local L = Spoilscribe.L
 
 local UI = Spoilscribe.UI
 local Search = {}
@@ -31,7 +32,7 @@ function Search:CreateSearchBar(controls, frame)
 
     local placeholder = searchBox:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     placeholder:SetPoint("LEFT", searchBox, "LEFT", 2, 0)
-    placeholder:SetText("Search items, stats, slot")
+    placeholder:SetText(L["Search items, stats, slot"])
     placeholder:SetTextColor(0.5, 0.5, 0.5)
     searchBox._placeholder = placeholder
 
@@ -109,7 +110,7 @@ function Search:CreateSettingsPopup(controls, frame, searchContainer)
 
     local popupTitle = settingsPopup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     popupTitle:SetPoint("TOPLEFT", settingsPopup, "TOPLEFT", 12, -10)
-    popupTitle:SetText("Search fields")
+    popupTitle:SetText(L["Search fields"])
 
     SpoilscribeDB.searchFields = SpoilscribeDB.searchFields or {
         itemName    = true,
@@ -121,12 +122,12 @@ function Search:CreateSettingsPopup(controls, frame, searchContainer)
     }
 
     local checkboxDefs = {
-        { key = "itemName",       label = "Item Name" },
-        { key = "bossName",       label = "Boss Name" },
-        { key = "slot",           label = "Slot" },
-        { key = "armorType",      label = "Armor Type" },
-        { key = "dungeonName",    label = "Dungeon Name" },
-        { key = "secondaryStats", label = "Secondary Stats" },
+        { key = "itemName",       label = L["Item Name"] },
+        { key = "bossName",       label = L["Boss Name"] },
+        { key = "slot",           label = L["Slot"] },
+        { key = "armorType",      label = L["Armor Type"] },
+        { key = "dungeonName",    label = L["Dungeon Name"] },
+        { key = "secondaryStats", label = L["Secondary Stats"] },
     }
 
     local cbY = -28

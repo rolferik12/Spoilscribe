@@ -1,4 +1,5 @@
 local addonName, Spoilscribe = ...
+local L = Spoilscribe.L
 
 Spoilscribe = Spoilscribe or {}
 
@@ -31,7 +32,7 @@ end
 local _specList = nil
 function Spoilscribe:GetSpecList()
     if _specList then return _specList end
-    _specList = { { label = "All Specs", classID = 0, specID = 0 } }
+    _specList = { { label = L["All Specs"], classID = 0, specID = 0 } }
     local numSpecs = GetNumSpecializations and GetNumSpecializations() or 0
     for i = 1, numSpecs do
         local id, name, _, icon, _, classID = GetSpecializationInfo(i)
@@ -51,7 +52,7 @@ function Spoilscribe:GetQualityColoredItemText(loot)
         return loot.link
     end
 
-    local name = loot.name or ("Item " .. tostring(loot.itemID))
+    local name = loot.name or string.format(L["Item %d"], loot.itemID)
     if not loot.itemID then
         return name
     end

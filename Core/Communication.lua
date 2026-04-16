@@ -1,4 +1,5 @@
 local _, Spoilscribe = ...
+local L = Spoilscribe.L
 
 -- Addon communication for sharing favorite dungeons with party.
 local COMM_PREFIX = "Spoilscribe"
@@ -186,7 +187,7 @@ function Spoilscribe:GetKeystoneHolders(dungeonName)
             myKeystoneName = C_ChallengeMode.GetMapUIInfo(mapID) or ""
         end
         if myKeystoneName ~= "" and string.lower(myKeystoneName) == string.lower(dungeonName) then
-            local myName = UnitName and UnitName("player") or "You"
+            local myName = UnitName and UnitName("player") or L["You"]
             holders[#holders + 1] = { name = myName, level = level }
         end
     end

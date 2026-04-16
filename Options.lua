@@ -1,4 +1,5 @@
 local addonName, Spoilscribe = ...
+local L = Spoilscribe.L
 
 -- Ensure per-character settings exist.
 SpoilscribeCharDB = SpoilscribeCharDB or {}
@@ -39,7 +40,7 @@ bindingBtn:Hide()
 
 -- Set globals so the binding appears in the default Keybindings UI.
 BINDING_HEADER_SPOILSCRIBE = "Spoilscribe"
-_G["BINDING_NAME_CLICK SpoilscribeOpenButton:LeftButton"] = "Open Spoilscribe"
+_G["BINDING_NAME_CLICK SpoilscribeOpenButton:LeftButton"] = L["Open Spoilscribe"]
 
 -- ── Options panel ───────────────────────────────────────────────────────────
 local panel = CreateFrame("Frame", "SpoilscribeOptionsPanel", UIParent)
@@ -52,12 +53,12 @@ title:SetText("Spoilscribe")
 
 local subtitle = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-subtitle:SetText("Per-character settings")
+subtitle:SetText(L["Per-character settings"])
 
 -- ── Group sync checkbox ─────────────────────────────────────────────────────
 local syncCheck = CreateFrame("CheckButton", "SpoilscribeOptSync", panel, "InterfaceOptionsCheckButtonTemplate")
 syncCheck:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", 0, -20)
-syncCheck.Text:SetText("Enable group sync (share favorites with party)")
+syncCheck.Text:SetText(L["Enable group sync (share favorites with party)"])
 syncCheck:SetChecked(GetOption("groupSync"))
 syncCheck:SetScript("OnClick", function(self)
     SetOption("groupSync", self:GetChecked() and true or false)
@@ -66,7 +67,7 @@ end)
 -- ── Keybind label + button ──────────────────────────────────────────────────
 local keybindLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 keybindLabel:SetPoint("TOPLEFT", syncCheck, "BOTTOMLEFT", 4, -24)
-keybindLabel:SetText("Open Spoilscribe:")
+keybindLabel:SetText(L["Open Spoilscribe:"])
 
 local keybindBtn = CreateFrame("Button", "SpoilscribeOptKeybind", panel, "UIPanelButtonTemplate")
 keybindBtn:SetSize(180, 26)
@@ -81,11 +82,11 @@ end
 local function UpdateKeybindText()
     local key = GetCurrentKeybind()
     if _waitingForKey then
-        keybindBtn:SetText("Press a key...")
+        keybindBtn:SetText(L["Press a key..."])
     elseif key ~= "" then
         keybindBtn:SetText(key)
     else
-        keybindBtn:SetText("Not bound")
+        keybindBtn:SetText(L["Not bound"])
     end
 end
 
@@ -168,7 +169,7 @@ end)
 local clearBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
 clearBtn:SetSize(70, 26)
 clearBtn:SetPoint("LEFT", keybindBtn, "RIGHT", 6, 0)
-clearBtn:SetText("Clear")
+clearBtn:SetText(L["Clear"])
 clearBtn:SetScript("OnClick", function()
     _waitingForKey = false
     local old = GetCurrentKeybind()

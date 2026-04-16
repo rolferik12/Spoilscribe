@@ -1,9 +1,10 @@
 local addonName, Spoilscribe = ...
+local L = Spoilscribe.L
 
 function Spoilscribe:Open()
     if not self.UI or not self.UI.ToggleMainFrame then
         if DEFAULT_CHAT_FRAME then
-            DEFAULT_CHAT_FRAME:AddMessage("Spoilscribe: UI failed to initialize.")
+            DEFAULT_CHAT_FRAME:AddMessage(L["Spoilscribe: UI failed to initialize."])
         end
         return
     end
@@ -43,7 +44,7 @@ f:SetScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4)
         -- Scan all difficulty+spec combos up front so the EJ is never needed again.
         local ok, err = pcall(function() Spoilscribe:ScanAllCombinations() end)
         if not ok then
-            Spoilscribe:LogToConsole("Initial loot scan failed: " .. tostring(err))
+            Spoilscribe:LogToConsole(string.format(L["Initial loot scan failed: %s"], tostring(err)))
         end
         -- Broadcast favorites and request party members' favorites.
         Spoilscribe:BroadcastFavorites()
