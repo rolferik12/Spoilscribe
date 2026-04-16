@@ -541,6 +541,51 @@ function UI:RenderFavorites()
         row:SetScript("OnEnter", function(self)
             if not (self.itemLink or self.itemID) then return end
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            -- Apply M+ bonus ID injection matching the selected difficulty.
+            local rewardInfo = frame._mythicPlusRewardInfo
+            local slotVal = self._pinnedData and self._pinnedData.slot or ""
+            local isOther = (slotVal == "" or slotVal == "Other")
+            if not isOther and self.itemLink and self.itemLink ~= "" and type(rewardInfo) == "table" and rewardInfo.bonusID then
+                local itemString = self.itemLink:match("item[%-?%d:]+")
+                if itemString then
+                    local fields = {}
+                    for field in (itemString .. ":"):gmatch("([^:]*):") do
+                        fields[#fields + 1] = field
+                    end
+                    while #fields < 14 do
+                        fields[#fields + 1] = ""
+                    end
+                    fields[13] = "35"
+                    local numBonuses = tonumber(fields[14]) or 0
+                    local newBonuses = {}
+                    for bi = 15, 14 + numBonuses do
+                        if fields[bi] ~= "3524" then
+                            newBonuses[#newBonuses + 1] = fields[bi]
+                        end
+                    end
+                    local mplusBonuses = Spoilscribe.Data.MythicPlusBonusIDs or {}
+                    for _, b in ipairs(mplusBonuses) do
+                        newBonuses[#newBonuses + 1] = tostring(b)
+                    end
+                    newBonuses[#newBonuses + 1] = tostring(rewardInfo.bonusID)
+                    for _ = 1, numBonuses do
+                        table.remove(fields, 15)
+                    end
+                    fields[14] = tostring(#newBonuses)
+                    for i, b in ipairs(newBonuses) do
+                        table.insert(fields, 14 + i, b)
+                    end
+                    local modifiedString = table.concat(fields, ":")
+                    local ok = pcall(GameTooltip.SetHyperlink, GameTooltip, modifiedString)
+                    if ok and GameTooltip:NumLines() and GameTooltip:NumLines() > 0 then
+                        GameTooltip:Show()
+                        return
+                    end
+                    GameTooltip:ClearLines()
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                end
+            end
+            -- Default tooltip path.
             if self.itemLink and self.itemLink ~= "" then
                 GameTooltip:SetHyperlink(self.itemLink)
             elseif self.itemID then
