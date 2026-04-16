@@ -151,7 +151,11 @@ function Spoilscribe:ScanLootForDifficultyAndSpec(difficultyId, classId, specId)
 
         local selected, selectError = TrySelectInstance(dungeon.ejInstanceID)
         if selected then
-            local dungeonEntry = { dungeonName = dungeon.name, items = {} }
+            local localizedName = dungeon.name
+            if EJ_GetInstanceInfo then
+                localizedName = EJ_GetInstanceInfo() or dungeon.name
+            end
+            local dungeonEntry = { dungeonName = localizedName, items = {} }
 
             for _, encounterID in ipairs(dungeon.encounters) do
                 local encounterSelected, encounterSelectError = TrySelectEncounter(encounterID)
@@ -159,7 +163,7 @@ function Spoilscribe:ScanLootForDifficultyAndSpec(difficultyId, classId, specId)
                 if not encounterSelected then
                     self:LogToConsole(string.format(
                         "Encounter select failed in %s (EncounterID: %d). %s",
-                        tostring(dungeon.name),
+                        tostring(localizedName),
                         tonumber(encounterID) or 0,
                         tostring(encounterSelectError or "No reason provided.")
                     ))
