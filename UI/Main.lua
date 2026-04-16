@@ -145,6 +145,19 @@ function UI:CreateMainFrame()
     UI.Favorites:CreateAssistButton(frame, zoomBtn)
 
     self.frame = frame
+
+    Spoilscribe.RefreshLocaleUI = function()
+        frame.title:SetText(L["Spoilscribe - Dungeon Loot"])
+        difficultyLabel:SetText(L["Difficulty"])
+        slotLabel:SetText(L["Slot"])
+        statsLabel:SetText(L["Secondary Stats"])
+        specLabel:SetText(L["Loot Spec"])
+        frame.difficultyDropdown:RefreshLocale()
+        frame.slotDropdown:RefreshLocale()
+        frame.secondaryDropdown:RefreshLocale()
+        frame.specDropdown:RefreshLocale()
+    end
+
     return frame
 end
 

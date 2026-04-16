@@ -458,17 +458,35 @@ function UI:RenderFavorites()
         end
     end
 
-    -- Group remaining items by slot.
-    local slotOrder = {}
+    -- Normalize raw API slot strings to canonical display names.
+    local slotNormalize = {
+        ["Finger"]             = "Ring",
+        ["Held In Off-hand"]   = "Off-Hand",
+        ["Off Hand"]           = "Off-Hand",
+        ["Shield"]             = "Off-Hand",
+        ["Main Hand"]          = "One-Hand",
+        ["One-Hand"]           = "One-Hand",
+        ["Two-Hand"]           = "Two-Hand",
+        ["Ranged"]             = "Ranged",
+    }
+
+    -- Group remaining items by slot using a fixed display order.
     local slotGroups = {}
     for _, item in ipairs(remainingItems) do
-        local slot = (item.slot and item.slot ~= "") and item.slot or L["Other"]
+        local raw = (item.slot and item.slot ~= "") and item.slot or "Other"
+        local slot = slotNormalize[raw] or raw
         if not slotGroups[slot] then
             slotGroups[slot] = {}
-            slotOrder[#slotOrder + 1] = slot
         end
         slotGroups[slot][#slotGroups[slot] + 1] = item
     end
+
+    -- Fixed slot order matching Data.Filters.slots (skip "Any Slot").
+    local fixedSlotOrder = {
+        "Head", "Neck", "Shoulder", "Back", "Chest", "Wrist",
+        "Hands", "Waist", "Legs", "Feet", "Ring", "Trinket",
+        "One-Hand", "Two-Hand", "Off-Hand", "Ranged", "Other",
+    }
 
     local ICON_SIZE = 32
     local ROW_HEIGHT = 36
@@ -648,10 +666,12 @@ function UI:RenderFavorites()
         end
     end
 
-    for _, slot in ipairs(slotOrder) do
-        RenderHeader(slot)
-        for _, item in ipairs(slotGroups[slot]) do
-            RenderItemRow(item)
+    for _, slot in ipairs(fixedSlotOrder) do
+        if slotGroups[slot] then
+            RenderHeader(L[slot])
+            for _, item in ipairs(slotGroups[slot]) do
+                RenderItemRow(item)
+            end
         end
     end
 

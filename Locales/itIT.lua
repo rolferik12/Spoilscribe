@@ -1,6 +1,8 @@
-if GetLocale() ~= "itIT" then return end
 local _, ns = ...
-local L = ns.L
+ns.LocaleData = ns.LocaleData or {}
+
+local L = {}
+ns.LocaleData["itIT"] = L
 
 -- Italian translations
 L["All Specs"] = "Tutte le specializzazioni"
@@ -51,3 +53,31 @@ L["Tip: /reload and open the addon again."] = "Suggerimento: usa /reload e apri 
 L["View Favorites"] = "Vedi preferiti"
 L["You"] = "Tu"
 L["Zoom Favorites"] = "Ingrandisci preferiti"
+
+-- Slot names
+L["Head"] = "Testa"
+L["Neck"] = "Collo"
+L["Shoulder"] = "Spalle"
+L["Back"] = "Schiena"
+L["Chest"] = "Torace"
+L["Wrist"] = "Polsi"
+L["Hands"] = "Mani"
+L["Waist"] = "Vita"
+L["Legs"] = "Gambe"
+L["Feet"] = "Piedi"
+L["Ring"] = "Anello"
+L["Trinket"] = "Monile"
+L["One-Hand"] = "A una mano"
+L["Two-Hand"] = "A due mani"
+L["Off-Hand"] = "Mano secondaria"
+L["Ranged"] = "A distanza"
+
+-- Secondary stats
+L["Critical Strike"] = "Colpo critico"
+L["Haste"] = "Celerità"
+L["Mastery"] = "Maestria"
+L["Versatility"] = "Versatilità"
+
+if GetLocale() == "itIT" then
+    for k, v in pairs(ns.LocaleData["itIT"]) do ns.L[k] = v end
+end

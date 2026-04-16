@@ -23,22 +23,26 @@ function Widgets:BuildDropdown(parent, width, items, defaultIndex, onChanged)
     local dropdown = CreateFrame("Frame", nil, parent, "UIDropDownMenuTemplate")
     UIDropDownMenu_SetWidth(dropdown, width)
 
+    local function GetItemText(item, index)
+        local text = item
+        if type(item) == "table" then
+            text = item.label or item.name
+        end
+        if text == nil then
+            return string.format(L["Option %d"], index)
+        end
+        return L[tostring(text)]
+    end
+
     local function Initialize(self, level)
         for index, item in ipairs(items) do
             local info = UIDropDownMenu_CreateInfo()
-            local text = item
-            if type(item) == "table" then
-                text = item.label or item.name
-            end
-            if text == nil then
-                text = string.format(L["Option %d"], index)
-            end
-            text = tostring(text)
-            info.text = text
+            info.text = GetItemText(item, index)
             info.checked = (index == (dropdown.selectedIndex or defaultIndex or 1))
             info.func = function()
                 dropdown.selectedIndex = index
-                UIDropDownMenu_SetSelectedID(dropdown, index)
+                UIDropDownMenu_SetText(dropdown, GetItemText(item, index))
+                CloseDropDownMenus()
                 if onChanged then
                     onChanged(index, item)
                 end
@@ -48,8 +52,14 @@ function Widgets:BuildDropdown(parent, width, items, defaultIndex, onChanged)
     end
 
     UIDropDownMenu_Initialize(dropdown, Initialize)
-    UIDropDownMenu_SetSelectedID(dropdown, defaultIndex or 1)
+    UIDropDownMenu_SetText(dropdown, GetItemText(items[defaultIndex or 1], defaultIndex or 1))
     dropdown.selectedIndex = defaultIndex or 1
+
+    function dropdown:RefreshLocale()
+        UIDropDownMenu_Initialize(self, Initialize)
+        UIDropDownMenu_SetText(self, GetItemText(items[self.selectedIndex or defaultIndex or 1],
+            self.selectedIndex or defaultIndex or 1))
+    end
 
     return dropdown
 end

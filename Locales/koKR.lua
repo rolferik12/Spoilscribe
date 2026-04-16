@@ -1,6 +1,8 @@
-if GetLocale() ~= "koKR" then return end
 local _, ns = ...
-local L = ns.L
+ns.LocaleData = ns.LocaleData or {}
+
+local L = {}
+ns.LocaleData["koKR"] = L
 
 -- Korean translations
 L["All Specs"] = "모든 전문화"
@@ -51,3 +53,31 @@ L["Tip: /reload and open the addon again."] = "팁: /reload 후 애드온을 다
 L["View Favorites"] = "즐겨찾기 보기"
 L["You"] = "나"
 L["Zoom Favorites"] = "즐겨찾기 확대"
+
+-- Slot names
+L["Head"] = "머리"
+L["Neck"] = "목"
+L["Shoulder"] = "어깨"
+L["Back"] = "등"
+L["Chest"] = "가슴"
+L["Wrist"] = "손목"
+L["Hands"] = "손"
+L["Waist"] = "허리"
+L["Legs"] = "다리"
+L["Feet"] = "발"
+L["Ring"] = "반지"
+L["Trinket"] = "장신구"
+L["One-Hand"] = "한손"
+L["Two-Hand"] = "양손"
+L["Off-Hand"] = "보조 손"
+L["Ranged"] = "원거리"
+
+-- Secondary stats
+L["Critical Strike"] = "치명타"
+L["Haste"] = "가속"
+L["Mastery"] = "특화"
+L["Versatility"] = "유연성"
+
+if GetLocale() == "koKR" then
+    for k, v in pairs(ns.LocaleData["koKR"]) do ns.L[k] = v end
+end

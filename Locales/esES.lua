@@ -1,6 +1,8 @@
-if GetLocale() ~= "esES" then return end
 local _, ns = ...
-local L = ns.L
+ns.LocaleData = ns.LocaleData or {}
+
+local L = {}
+ns.LocaleData["esES"] = L
 
 -- Spanish (Spain) translations
 L["All Specs"] = "Todas las especializaciones"
@@ -51,3 +53,31 @@ L["Tip: /reload and open the addon again."] = "Consejo: usa /reload y abre el ad
 L["View Favorites"] = "Ver favoritos"
 L["You"] = "Tú"
 L["Zoom Favorites"] = "Ampliar favoritos"
+
+-- Slot names
+L["Head"] = "Cabeza"
+L["Neck"] = "Cuello"
+L["Shoulder"] = "Hombro"
+L["Back"] = "Espalda"
+L["Chest"] = "Pecho"
+L["Wrist"] = "Muñeca"
+L["Hands"] = "Manos"
+L["Waist"] = "Cintura"
+L["Legs"] = "Piernas"
+L["Feet"] = "Pies"
+L["Ring"] = "Anillo"
+L["Trinket"] = "Abalorio"
+L["One-Hand"] = "Una mano"
+L["Two-Hand"] = "Dos manos"
+L["Off-Hand"] = "Mano izquierda"
+L["Ranged"] = "A distancia"
+
+-- Secondary stats
+L["Critical Strike"] = "Golpe crítico"
+L["Haste"] = "Celeridad"
+L["Mastery"] = "Maestría"
+L["Versatility"] = "Versatilidad"
+
+if GetLocale() == "esES" then
+    for k, v in pairs(ns.LocaleData["esES"]) do ns.L[k] = v end
+end

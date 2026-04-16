@@ -1,6 +1,8 @@
-if GetLocale() ~= "zhTW" then return end
 local _, ns = ...
-local L = ns.L
+ns.LocaleData = ns.LocaleData or {}
+
+local L = {}
+ns.LocaleData["zhTW"] = L
 
 -- Chinese (Traditional) translations
 L["All Specs"] = "所有專精"
@@ -51,3 +53,31 @@ L["Tip: /reload and open the addon again."] = "提示：請嘗試 /reload 並重
 L["View Favorites"] = "查看收藏"
 L["You"] = "你"
 L["Zoom Favorites"] = "放大收藏"
+
+-- Slot names
+L["Head"] = "頭部"
+L["Neck"] = "頸部"
+L["Shoulder"] = "肩部"
+L["Back"] = "背部"
+L["Chest"] = "胸部"
+L["Wrist"] = "腕部"
+L["Hands"] = "手"
+L["Waist"] = "腰部"
+L["Legs"] = "腿部"
+L["Feet"] = "腳"
+L["Ring"] = "戒指"
+L["Trinket"] = "飾品"
+L["One-Hand"] = "單手"
+L["Two-Hand"] = "雙手"
+L["Off-Hand"] = "副手"
+L["Ranged"] = "遠程"
+
+-- Secondary stats
+L["Critical Strike"] = "致命一擊"
+L["Haste"] = "加速"
+L["Mastery"] = "精通"
+L["Versatility"] = "臨機應變"
+
+if GetLocale() == "zhTW" then
+    for k, v in pairs(ns.LocaleData["zhTW"]) do ns.L[k] = v end
+end

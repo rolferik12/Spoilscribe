@@ -1,6 +1,8 @@
-if GetLocale() ~= "ruRU" then return end
 local _, ns = ...
-local L = ns.L
+ns.LocaleData = ns.LocaleData or {}
+
+local L = {}
+ns.LocaleData["ruRU"] = L
 
 -- Russian translations
 L["All Specs"] = "Все специализации"
@@ -51,3 +53,31 @@ L["Tip: /reload and open the addon again."] = "Совет: введите /reloa
 L["View Favorites"] = "Посмотреть избранное"
 L["You"] = "Вы"
 L["Zoom Favorites"] = "Масштаб избранного"
+
+-- Slot names
+L["Head"] = "Голова"
+L["Neck"] = "Шея"
+L["Shoulder"] = "Плечо"
+L["Back"] = "Спина"
+L["Chest"] = "Грудь"
+L["Wrist"] = "Запястья"
+L["Hands"] = "Кисти рук"
+L["Waist"] = "Пояс"
+L["Legs"] = "Ноги"
+L["Feet"] = "Ступни"
+L["Ring"] = "Кольцо"
+L["Trinket"] = "Аксессуар"
+L["One-Hand"] = "Одноручное"
+L["Two-Hand"] = "Двуручное"
+L["Off-Hand"] = "Левая рука"
+L["Ranged"] = "Дальний бой"
+
+-- Secondary stats
+L["Critical Strike"] = "Критический удар"
+L["Haste"] = "Скорость"
+L["Mastery"] = "Искусность"
+L["Versatility"] = "Универсальность"
+
+if GetLocale() == "ruRU" then
+    for k, v in pairs(ns.LocaleData["ruRU"]) do ns.L[k] = v end
+end

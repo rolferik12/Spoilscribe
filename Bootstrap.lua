@@ -21,7 +21,15 @@ end
 
 SLASH_SPOILSCRIBE1 = "/spoilscribe"
 SLASH_SPOILSCRIBE2 = "/ss"
-SlashCmdList.SPOILSCRIBE = function()
+SlashCmdList.SPOILSCRIBE = function(msg)
+    local localeCode = msg and msg:match("^locale%s+(%S+)")
+    if localeCode then
+        if type(Spoilscribe.SetDebugLocale) == "function" then
+            SafeCall(function() Spoilscribe.SetDebugLocale(localeCode) end, L["Spoilscribe: command failed"])
+        end
+        return
+    end
+
     if type(Spoilscribe.Open) == "function" then
         SafeCall(function() Spoilscribe:Open() end, L["Spoilscribe: command failed"])
     elseif DEFAULT_CHAT_FRAME then

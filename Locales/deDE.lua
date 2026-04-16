@@ -1,6 +1,8 @@
-if GetLocale() ~= "deDE" then return end
 local _, ns = ...
-local L = ns.L
+ns.LocaleData = ns.LocaleData or {}
+
+local L = {}
+ns.LocaleData["deDE"] = L
 
 -- German translations
 L["All Specs"] = "Alle Spezialisierungen"
@@ -51,3 +53,31 @@ L["Tip: /reload and open the addon again."] = "Tipp: /reload und öffne das Addo
 L["View Favorites"] = "Favoriten anzeigen"
 L["You"] = "Du"
 L["Zoom Favorites"] = "Favoriten vergrößern"
+
+-- Slot names
+L["Head"] = "Kopf"
+L["Neck"] = "Hals"
+L["Shoulder"] = "Schulter"
+L["Back"] = "Rücken"
+L["Chest"] = "Brust"
+L["Wrist"] = "Handgelenk"
+L["Hands"] = "Hände"
+L["Waist"] = "Taille"
+L["Legs"] = "Beine"
+L["Feet"] = "Füße"
+L["Ring"] = "Ring"
+L["Trinket"] = "Schmuckstück"
+L["One-Hand"] = "Einhand"
+L["Two-Hand"] = "Zweihand"
+L["Off-Hand"] = "Nebenhand"
+L["Ranged"] = "Fernkampf"
+
+-- Secondary stats
+L["Critical Strike"] = "Kritische Trefferwertung"
+L["Haste"] = "Tempo"
+L["Mastery"] = "Meisterschaft"
+L["Versatility"] = "Vielseitigkeit"
+
+if GetLocale() == "deDE" then
+    for k, v in pairs(ns.LocaleData["deDE"]) do ns.L[k] = v end
+end

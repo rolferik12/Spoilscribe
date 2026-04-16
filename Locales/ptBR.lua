@@ -1,6 +1,8 @@
-if GetLocale() ~= "ptBR" then return end
 local _, ns = ...
-local L = ns.L
+ns.LocaleData = ns.LocaleData or {}
+
+local L = {}
+ns.LocaleData["ptBR"] = L
 
 -- Portuguese (Brazil) translations
 L["All Specs"] = "Todas as especializações"
@@ -51,3 +53,31 @@ L["Tip: /reload and open the addon again."] = "Dica: use /reload e abra o addon 
 L["View Favorites"] = "Ver favoritos"
 L["You"] = "Você"
 L["Zoom Favorites"] = "Ampliar favoritos"
+
+-- Slot names
+L["Head"] = "Cabeça"
+L["Neck"] = "Pescoço"
+L["Shoulder"] = "Ombro"
+L["Back"] = "Costas"
+L["Chest"] = "Peito"
+L["Wrist"] = "Pulso"
+L["Hands"] = "Mãos"
+L["Waist"] = "Cintura"
+L["Legs"] = "Pernas"
+L["Feet"] = "Pés"
+L["Ring"] = "Anel"
+L["Trinket"] = "Berloque"
+L["One-Hand"] = "Uma Mão"
+L["Two-Hand"] = "Duas Mãos"
+L["Off-Hand"] = "Mão Secundária"
+L["Ranged"] = "À Distância"
+
+-- Secondary stats
+L["Critical Strike"] = "Acerto Crítico"
+L["Haste"] = "Aceleração"
+L["Mastery"] = "Maestria"
+L["Versatility"] = "Versatilidade"
+
+if GetLocale() == "ptBR" then
+    for k, v in pairs(ns.LocaleData["ptBR"]) do ns.L[k] = v end
+end
