@@ -1,4 +1,4 @@
-## Interface: 120001
+## Interface: 120001, 120005
 ## Title: Spoilscribe
 ## Notes: Dungeon loot browser using static encounter IDs.
 ## Author: You
